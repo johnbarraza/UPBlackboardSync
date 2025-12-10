@@ -13,6 +13,11 @@ class BStream:
         """Schedule the write operation."""
 
         def _write() -> None:
+            # Ensure parent directories exist before writing the file
+            parent = path.parent
+            if parent:
+                parent.mkdir(parents=True, exist_ok=True)
+
             with path.open("wb") as f:
                 for chunk in stream.iter_content(chunk_size=self.CHUNK_SIZE):
                     f.write(chunk)
@@ -28,6 +33,11 @@ class FStream:
         """Schedule the write operation."""
 
         def _write() -> None:
+            # Ensure parent directories exist before writing the file
+            parent = path.parent
+            if parent:
+                parent.mkdir(parents=True, exist_ok=True)
+
             with path.open('w', encoding='utf-8') as f:
                 f.write(body)
 

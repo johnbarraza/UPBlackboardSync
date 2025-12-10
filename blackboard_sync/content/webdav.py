@@ -20,11 +20,14 @@ Parse an html to look for links
 # MA  02110-1301, USA.
 
 
+import os
+import re
+import uuid
 import mimetypes
 from pathlib import Path
 from requests import Response
 from bs4 import BeautifulSoup
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse, parse_qs
 from typing import List, NamedTuple
 from pathvalidate import sanitize_filename
 from concurrent.futures import ThreadPoolExecutor
@@ -61,13 +64,56 @@ class ContentParser:
             uri = el.get(attr)
 
             if uri:
-                # Handle url-encoding
-                filename = unquote(uri.split('/')[-1])
-                links.append(Link(href=uri, text=filename))
+                display = None
 
-                # Replace for local instance
+                # Priority 1: Check aria-label for filename (Blackboard Ultra uses this)
+                aria_label = el.get('aria-label', '')
+                if aria_label:
+                    # Extract filename from patterns like "Preview File filename.pdf"
+                    match = re.search(r'(?:Preview File|Download|File)\s+(.+?)(?:\s*$)', aria_label)
+                    if match:
+                        candidate = match.group(1).strip()
+                        if candidate and not candidate.lower().startswith('xid'):
+                            display = candidate
+
+                # Priority 2: Check aria-controls for filename extraction
+                if not display:
+                    aria_controls = el.get('aria-controls', '')
+                    if 'xid-' in aria_controls:
+                        # Try to extract filename from URLs like file-preview-...xid-19839037_1
+                        parsed = urlparse(uri)
+                        last = unquote(os.path.basename(parsed.path))
+                        if not last or last.lower().startswith('xid'):
+                            # Try query params
+                            qs = parse_qs(parsed.query)
+                            for key in ('filename', 'file', 'name', 'FileName'):
+                                if key in qs and qs[key]:
+                                    display = qs[key][0]
+                                    break
+
+                # Priority 3: Use visible text if present and meaningful
+                if not display:
+                    text_val = (el.text or '').strip()
+                    if text_val and not text_val.lower().startswith('xid'):
+                        display = text_val
+
+                # Priority 4: Parse URL and extract sensible filename
+                if not display:
+                    parsed = urlparse(uri)
+                    last = unquote(os.path.basename(parsed.path))
+                    if (not last) or ('=' in last) or last.lower().startswith('xid'):
+                        qs = parse_qs(parsed.query)
+                        for key in ('filename', 'file', 'name', 'FileName', 'xid'):
+                            if key in qs and qs[key]:
+                                last = qs[key][0]
+                                break
+                    display = last or parsed.netloc or f"file-{uuid.uuid4()}"
+
+                links.append(Link(href=uri, text=display))
+
+                # Replace href/src with a local filename when it's a same-site link
                 if uri.startswith(base_url):
-                    el[attr] = filename
+                    el[attr] = display
         return links
 
     @property
@@ -106,10 +152,31 @@ def validate_webdav_response(response: Response,
 class WebDavFile(BStream):
     """A Blackboard WebDav file which can be downloaded directly"""
     def __init__(self, link: Link, job: DownloadJob) -> None:
-        self.title = sanitize_filename(link.text, replacement_text="_")
+        # Download first, then try to determine a safe filename
         self.stream = job.session.download_webdav(webdav_url=link.href)
+
+        # Try to extract filename from Content-Disposition header
+        cd = self.stream.headers.get('Content-Disposition', '')
+        filename = None
+        if cd:
+            m = re.search(r'filename\*?=(?:UTF-8''?)?\"?([^\";]+)\"?', cd)
+            if m:
+                filename = m.group(1)
+
+        if not filename:
+            # Use the parsed link text (from ContentParser) if it seems ok
+            candidate = link.text or ''
+            # If candidate looks like an encoded query param or xid, fall back
+            if not candidate or ('=' in candidate) or candidate.lower().startswith('xid'):
+                parsed = urlparse(link.href)
+                candidate = unquote(os.path.basename(parsed.path)) or f"file-{uuid.uuid4()}"
+
+            filename = candidate
+
+        self.title = sanitize_filename(unquote(filename), replacement_text="_")
+
         content_type = self.stream.headers.get('Content-Type', 'text/plain')
-        self.extension = mimetypes.guess_extension(content_type)
+        self.extension = mimetypes.guess_extension(content_type) or ''
         self.valid = validate_webdav_response(self.stream, link.href,
                                               job.session.instance_url)
 

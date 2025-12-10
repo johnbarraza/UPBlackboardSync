@@ -817,5 +817,20 @@
       "target_url": "https://api.bbsync.app/ultra/"
     },
     "api_url": "https://api.bbsync.app"
+  },
+  {
+    "name": "Universidad del Pacífico",
+    "short_name": "UP",
+    "country": "PE",
+    "login": {
+      "start_url": "https://aulavirtual.up.edu.pe/",
+      "target_url": "https://aulavirtual.up.edu.pe/ultra/course"
+    },
+    "network": {
+      "name": [
+        "45.231.72.0 - 45.231.75.255"
+      ]
+    },
+    "api_url": "https://aulavirtual.up.edu.pe"
   }
 ]

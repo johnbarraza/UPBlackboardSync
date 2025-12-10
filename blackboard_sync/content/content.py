@@ -16,6 +16,8 @@ from . import folder, document, externallink, body, unhandled
 
 from .api_path import BBContentPath
 from .job import DownloadJob
+from .webdav import ContentParser
+from pathvalidate import sanitize_filename
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,35 @@ class Content:
             return
 
         Handler = Content.get_handler(content.contentHandler)
-        self.title = content.title_path_safe.replace('.', '_')
+        # Prefer the provided title, but Blackboard sometimes uses the
+        # placeholder 'ultraDocumentBody' for items that only have HTML
+        # content. In that case, try to extract a meaningful title from the
+        # HTML body (first heading or first line of text).
+        raw_title = getattr(content, 'title', None) or ''
+
+        if raw_title and raw_title != 'ultraDocumentBody':
+            chosen = raw_title
+        else:
+            chosen = None
+            try:
+                if getattr(content, 'body', None):
+                    parser = ContentParser(content.body, job.session.instance_url)
+                    text = (parser.text or '').strip()
+                    if text:
+                        # use first non-empty line as title
+                        first_line = next((ln for ln in text.splitlines() if ln.strip()), None)
+                        chosen = first_line
+                    # fallback to first link text
+                    if not chosen and parser.links:
+                        chosen = parser.links[0].text
+            except Exception:
+                chosen = None
+
+            if not chosen:
+                chosen = raw_title or 'Untitled'
+
+        # Make a filesystem-safe title
+        self.title = sanitize_filename(str(chosen).replace('.', '_'))
 
         try:
             self.handler = Handler(content, api_path, job)
