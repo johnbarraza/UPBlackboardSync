@@ -1,6 +1,6 @@
-# BlackboardSync
+# UP BlackboardSync
 ### Automatic Downloads Of Your Blackboard Content
-
+This is a fork for the Universidad del Pacifico (Peru)
 [![Get on PyPI][pypi-shield]][pypi] [![License: GPL  v2][license-shield]][gnu] [![Build][build-shield]][actions] [![Matrix][matrix-shield]][matrix]
 
 **BlackboardSync** performs a periodic,
