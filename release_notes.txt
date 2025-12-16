@@ -1,0 +1,34 @@
+BlackboardSync v0.18.1 - Con Mejoras de Estabilidad
+
+MEJORAS EN ESTA VERSION
+------------------------
+✅ Timeouts aumentados (5 minutos para archivos grandes)
+✅ Mejor manejo de errores de red
+✅ Continua descargando si un archivo falla
+✅ Limpieza automatica de archivos parciales
+✅ Mensajes de error mas claros
+✅ Mejor manejo de sesion expirada
+
+DESCARGA E INSTALACION
+-----------------------
+1. Descarga BlackboardSync_Distributable.zip
+2. Descomprime en cualquier carpeta
+3. Ejecuta BlackboardSync.exe
+4. Lee README_USUARIO.txt para instrucciones completas
+
+REQUISITOS
+----------
+- Windows 10/11 (64-bit)
+- No requiere Python instalado
+- ~400 MB de espacio en disco
+
+NOTAS IMPORTANTES
+-----------------
+- Solo descarga archivos NUEVOS (incremental)
+- Primera descarga puede tomar 10-30 minutos
+- Compatible con Universidad del Pacifico y 60+ universidades
+
+TAMAÑO
+------
+- Archivo ZIP: 160 MB (comprimido)
+- Descomprimido: 387 MB

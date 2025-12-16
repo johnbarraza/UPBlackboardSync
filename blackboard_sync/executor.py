@@ -15,11 +15,16 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import logging
 from typing import Any
 from collections.abc import Callable
 
 from concurrent.futures import ThreadPoolExecutor, Future
 from concurrent.futures import wait as wait_futures
+from requests.exceptions import ChunkedEncodingError, ConnectionError, Timeout
+from blackboard.exceptions import BBUnauthorizedError
+
+logger = logging.getLogger(__name__)
 
 
 class SyncExecutor(ThreadPoolExecutor):
@@ -40,5 +45,28 @@ class SyncExecutor(ThreadPoolExecutor):
     def raise_exceptions(self, timeout: int | None = None) -> None:
         done, not_done = wait_futures(self.futures, timeout)
 
+        failed_files = 0
+        session_expired = False
+
         for future in done:
-            future.result()
+            try:
+                future.result()
+            except BBUnauthorizedError:
+                # Session expired - this is critical, re-raise
+                logger.error("Session expired - you may have logged in from another location")
+                session_expired = True
+            except (ChunkedEncodingError, ConnectionError, Timeout) as e:
+                # Network errors - log but continue with other files
+                failed_files += 1
+                logger.warning(f"Network error during download: {type(e).__name__}")
+            except Exception as e:
+                # Other errors - log but continue
+                failed_files += 1
+                logger.error(f"Unexpected error during download: {type(e).__name__}: {e}")
+
+        if failed_files > 0:
+            logger.warning(f"{failed_files} file(s) failed to download. They will be retried on next sync.")
+
+        # Only raise if session expired (critical error)
+        if session_expired:
+            raise BBUnauthorizedError("Session expired")

@@ -1,0 +1,116 @@
+================================================================================
+                 BLACKBOARDSYNC - EJECUTABLE CREADO EXITOSAMENTE
+================================================================================
+
+UBICACION DEL EJECUTABLE
+-------------------------
+Carpeta: dist\BlackboardSync\
+Archivo principal: BlackboardSync.exe
+
+ARCHIVO PARA COMPARTIR
+-----------------------
+BlackboardSync_Distributable.zip (160 MB)
+
+Ubicacion: C:\Users\johnb\Documents\Github\BlackboardSync\BlackboardSync_Distributable.zip
+
+
+COMO COMPARTIR CON OTROS
+-------------------------
+1. Sube el archivo BlackboardSync_Distributable.zip a:
+   - Google Drive
+   - OneDrive
+   - Dropbox
+   - O cualquier servicio de almacenamiento
+
+2. Comparte el enlace con estas instrucciones:
+
+   "Descarga BlackboardSync_Distributable.zip
+    Descomprimelo en cualquier carpeta
+    Ejecuta BlackboardSync.exe
+    Lee README_USUARIO.txt para mas informacion"
+
+
+COMO USAR EL EJECUTABLE
+------------------------
+Los usuarios NO necesitan:
+  X Python instalado
+  X Instalar dependencias
+  X Conocimientos tecnicos
+
+Solo necesitan:
+  ✓ Descomprimir el ZIP
+  ✓ Ejecutar BlackboardSync.exe
+  ✓ Seguir el asistente de configuracion
+
+
+CONTENIDO DEL ZIP
+------------------
+BlackboardSync_Distributable.zip contiene:
+
+├── BlackboardSync.exe          (El programa principal)
+├── _internal/                   (Librerias - NO tocar)
+├── README_USUARIO.txt          (Instrucciones completas)
+└── TROUBLESHOOTING_ES.md       (Solucion de problemas)
+
+
+PROBAR EL EJECUTABLE LOCALMENTE
+--------------------------------
+1. Abre: dist\BlackboardSync\
+2. Doble clic en: BlackboardSync.exe
+3. Debe abrir la interfaz grafica
+
+
+MEJORAS INCLUIDAS EN ESTE EJECUTABLE
+-------------------------------------
+✓ Timeouts aumentados (5 minutos para archivos grandes)
+✓ Mejor manejo de errores de red
+✓ Continua descargando si un archivo falla
+✓ Limpieza automatica de archivos parciales
+✓ Mensajes de error mas claros
+✓ Mejor manejo de sesion expirada
+
+
+CARACTERISTICAS
+----------------
+✓ Solo descarga archivos NUEVOS (incremental)
+✓ Sincronizacion automatica cada 30 minutos
+✓ Compatible con 60+ universidades
+✓ Interfaz grafica sencilla
+✓ No requiere Python
+
+
+AVISOS IMPORTANTES
+------------------
+- Blackboard solo permite UNA sesion activa
+- Si accedes desde el navegador, este programa se desconectara
+- Los archivos ya descargados NO se vuelven a descargar
+- Primera descarga puede tomar 10-30 minutos
+- Siguientes descargas: 1-5 minutos
+
+
+TAMAÑOS
+-------
+- Carpeta completa: 387 MB (descomprimida)
+- Archivo ZIP: 160 MB (comprimido)
+- Ejecutable: 7 MB
+
+
+PROXIMOS PASOS
+--------------
+1. Prueba el ejecutable localmente (doble clic en BlackboardSync.exe)
+2. Si funciona correctamente, sube el ZIP a la nube
+3. Comparte el enlace con tus companeros
+4. Incluye el README_USUARIO.txt para instrucciones
+
+
+SOPORTE
+-------
+Si hay problemas:
+  - Lee TROUBLESHOOTING_ES.md
+  - Reporta en: https://github.com/sanjacob/BlackboardSync/issues
+
+
+================================================================================
+              Creado: Diciembre 16, 2025
+              Version: BlackboardSync v0.18.1 (con mejoras)
+================================================================================

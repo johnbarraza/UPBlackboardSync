@@ -110,6 +110,17 @@ class BlackboardSync:
 
         try:
             u_sess = BlackboardExtended(api_url, cookies=cookies)
+
+            # Configure session timeouts for better handling of large files
+            # Set longer timeouts: 30s connect, 300s read (5 minutes)
+            if hasattr(u_sess, 'session') and hasattr(u_sess.session, 'request'):
+                original_request = u_sess.session.request
+                def request_with_timeout(*args, **kwargs):
+                    if 'timeout' not in kwargs:
+                        kwargs['timeout'] = (30, 300)  # (connect, read)
+                    return original_request(*args, **kwargs)
+                u_sess.session.request = request_with_timeout
+
             # should trigger exception if not authenticated
             u_sess.fetch_users(user_id='me')
         except (BBUnauthorizedError, BBForbiddenError):
@@ -152,10 +163,16 @@ class BlackboardSync:
         try:
             start_time = self._download.download()
         except BBUnauthorizedError:
-            logger.exception("User session expired")
+            logger.warning("Session expired - please log in again from the application")
+            logger.info("Your session may have expired because you logged in from another location (browser, mobile app, etc.)")
             self.log_out()
+        except (RequestException) as e:
+            logger.warning(f"Network error during sync: {type(e).__name__}")
+            logger.info("The sync will be retried automatically on the next scheduled sync")
+            # Don't mark as permanent error, just postpone
+            self.schedule_next_sync(datetime.now(timezone.utc))
         except Exception:
-            logger.exception("Download error")
+            logger.exception("Unexpected error during download")
             self._has_error = True
 
             # manually postpone next sync job
