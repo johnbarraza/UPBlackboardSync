@@ -158,15 +158,6 @@ and [Rita Łyczywek][bulldogjob]
 Flathub team for their quick work in approving the app :heart:
 
 
-<!-- Project -->
-
-[releases]: https://github.com/sanjacob/BlackboardSync/releases "BlackboardSync Releases"
-[issues]: https://github.com/sanjacob/BlackboardSync/issues/new "BlackboardSync Issues"
-[stable]: https://github.com/sanjacob/BlackboardSync/releases/latest
-[actions]: https://github.com/sanjacob/BlackboardSync/actions
-[build-shield]: https://img.shields.io/github/actions/workflow/status/sanjacob/BlackboardSync/build.yml?branch=main
-[MacOSInstall]: https://github.com/sanjacob/BlackboardSync/assets/52013991/6be5e390-3f66-4eb4-b8d5-6f3230ae52ef
-
 <!-- Dependencies -->
 
 [git]: https://git-scm.com/	"Git"
@@ -184,12 +175,6 @@ Flathub team for their quick work in approving the app :heart:
 [pypi]: https://pypi.org/project/blackboardsync
 [pypi-shield]: https://img.shields.io/pypi/v/BlackboardSync?color=%23241F21
 
-<!-- Donations -->
-
-[kofi]: https://ko-fi.com/Q5Q17XN36
-[liberapay]: https://liberapay.com/BlackboardSync
-[kofi-shield]: https://ko-fi.com/img/githubbutton_sm.svg
-[lp-shield]: https://img.shields.io/liberapay/receives/BlackboardSync.svg?logo=liberapay
 
 <!-- Licence -->
 
