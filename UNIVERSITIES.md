@@ -171,6 +171,8 @@ If this is not something you'd like, please let me know.
 - Universidad del Valle de Mexico
 - Universidad Regional del Sureste
 
+###### Perú
+- Universidad del Pacífico (UP)
 ### Asia
 
 - Princess Nourah Bint Abdulrahman University
