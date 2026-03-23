@@ -208,3 +208,5 @@ other/
 
 # download.py stand-alone default
 sync/
+/.planning
+/.claude
