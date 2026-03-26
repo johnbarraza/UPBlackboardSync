@@ -41,6 +41,7 @@ class SyncController:
                             get_names(), autodetect())
 
         first_time = self.model.university is None
+        self._pending_setup_course_selection = first_time
 
         if not first_time:
             self.open_login()
@@ -60,6 +61,7 @@ class SyncController:
         self.ui.signals.log_in.connect(self.log_in)
         self.ui.signals.log_out.connect(self.log_out)
         self.ui.signals.quit.connect(self.quit)
+        self.ui.signals.auth_drive.connect(self.auth_drive)
 
     def open_login(self) -> None:
         start_url = str(self.model.university.login.start_url)
@@ -79,10 +81,19 @@ class SyncController:
         except PackageNotFoundError:
             pass
 
+        courses = self.model.list_available_courses_summary()
         self.ui.open_settings(self.model.download_location,
                               self.model.username,
                               self.model.sync_interval,
-                              __version__)
+                              __version__,
+                              self.model.backup_enabled,
+                              self.model.backup_location,
+                              self.model.drive_enabled,
+                              self.model.drive_credentials_path,
+                              self.model.drive_email,
+                              courses,
+                              self.model.selected_course_ids,
+                              self.model.course_sync_status)
 
     def open_menu(self) -> None:
         self.ui.open_menu(self.model.last_sync_time,
@@ -105,20 +116,41 @@ class SyncController:
     def setup(self, institution_index: int,
               download_location: str, min_year: int) -> None:
         self.model.setup(institution_index, download_location, min_year)
+        self._pending_setup_course_selection = True
         self.open_login()
 
-    def config(self, download_location: str, sync_frequency: int) -> None:
+    def config(self, download_location: str, sync_frequency: int,
+               backup_enabled: bool, backup_location: str | None,
+               drive_enabled: bool, drive_credentials_path: str | None,
+               selected_course_ids: list[str]) -> None:
         if self.model.download_location != download_location:
             self.model.download_location = download_location
             self.ui.ask_redownload()
 
         self.model.sync_interval = sync_frequency
+        self.model.backup_enabled = backup_enabled
+        self.model.backup_location = backup_location
+        self.model.drive_enabled = drive_enabled
+        self.model.drive_credentials_path = drive_credentials_path
+        self.model.selected_course_ids = selected_course_ids
 
     def redownload(self) -> None:
         self.model.redownload()
 
     def log_in(self, cookies: RequestsCookieJar) -> None:
-        if self.model.auth(cookies):
+        if self.model.auth(cookies, start_sync=False):
+            if self._pending_setup_course_selection:
+                courses = self.model.list_available_courses_summary()
+                selected = self.ui.ask_course_selection(
+                    courses,
+                    self.model.selected_course_ids,
+                    self.model.course_sync_status
+                )
+                if selected is not None:
+                    self.model.selected_course_ids = selected
+                self._pending_setup_course_selection = False
+
+            self.model.start_sync()
             self.ui.log_in()
             self.ui.notify_running()
             self.check_for_updates()
@@ -138,6 +170,17 @@ class SyncController:
     def check_for_updates(self) -> None:
         if check_for_updates():
             self.ui.notify_update()
+
+    def auth_drive(self, credentials_path: str | None) -> None:
+        if credentials_path:
+            self.model.drive_credentials_path = credentials_path
+        
+        if self.model.authenticate_drive():
+            # Refresh settings to show connected status
+            self.open_settings()
+        else:
+            # Maybe show error? For now just re-open settings
+            self.open_settings()
 
 
 if __name__ == '__main__':

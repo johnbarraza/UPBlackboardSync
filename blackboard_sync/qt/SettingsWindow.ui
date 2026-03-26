@@ -110,6 +110,161 @@
       </widget>
      </item>
      <item>
+      <spacer name="verticalSpacer_5">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Fixed</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QLabel" name="backup_location_label">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Backup location (optional)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="enable_backup">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Enable Backup</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="backup_location_hint">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="select_backup_location">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Select backup folder</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer_6">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeType">
+        <enum>QSizePolicy::Fixed</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QLabel" name="drive_label">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Google Drive Integration</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QCheckBox" name="enable_drive">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Enable Drive Sync</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="select_credentials">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Select credentials.json</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="drive_auth_button">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>11</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Sign in with Google</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="drive_status_label">
+       <property name="font">
+        <font>
+         <family>Open Sans</family>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
+       <property name="text">
+        <string>Not connected</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="verticalSpacer_2">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
@@ -138,8 +293,8 @@
        </property>
       </widget>
      </item>
-     <item>
-      <widget class="QComboBox" name="frequency_combo">
+      <item>
+       <widget class="QComboBox" name="frequency_combo">
        <property name="enabled">
         <bool>true</bool>
        </property>
@@ -164,10 +319,71 @@
          <string>6 hours</string>
         </property>
        </item>
-      </widget>
-     </item>
-     <item>
-      <spacer name="verticalSpacer">
+       </widget>
+      </item>
+      <item>
+       <spacer name="verticalSpacer_courses">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>12</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="courses_label">
+        <property name="font">
+         <font>
+          <family>Open Sans</family>
+          <pointsize>11</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Courses to sync</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="select_courses_button">
+        <property name="font">
+         <font>
+          <family>Open Sans</family>
+          <pointsize>11</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Select courses</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="selected_courses_hint">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="font">
+         <font>
+          <family>Open Sans</family>
+          <pointsize>10</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>All courses</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>
        </property>

@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import QApplication, QSystemTrayIcon, QWidget
 
 from . import SetupWizard, LoginWebView, SettingsWindow, SyncTrayIcon
 from .notification import Event
-from .dialogs import Dialogs
+from .dialogs import Dialogs, CourseSelectionDialog
 from .utils import add_to_startup, open_in_file_browser, windows_safe_path
 from .assets import get_translations
 
@@ -39,8 +39,9 @@ class UIManager(QObject):
         open_menu = pyqtSignal()
         open_downloads = pyqtSignal()
         setup = pyqtSignal(int, Path, int)
-        config = pyqtSignal(Path, int)
+        config = pyqtSignal(Path, int, bool, object, bool, object, object)
         force_sync = pyqtSignal()
+        auth_drive = pyqtSignal(object)
         log_out = pyqtSignal()
         log_in = pyqtSignal(RequestsCookieJar)
         redownload = pyqtSignal()
@@ -86,6 +87,7 @@ class UIManager(QObject):
         self.config_window.signals.save.connect(self.slot_config)
         self.config_window.signals.log_out.connect(self.slot_log_out)
         self.config_window.signals.setup_wiz.connect(self.slot_open_setup)
+        self.config_window.signals.auth_drive.connect(self.slot_auth_drive)
 
         self.tray.signals.force_sync.connect(self.signals.force_sync)
         self.tray.signals.show_menu.connect(self.signals.open_menu)
@@ -173,20 +175,64 @@ class UIManager(QObject):
         self.hide(self.config_window)
 
         sync_dir = windows_safe_path(self.config_window.download_location)
-        self.signals.config.emit(sync_dir, self.config_window.sync_frequency)
+        backup_dir = None
+        if self.config_window.backup_location:
+            backup_dir = windows_safe_path(self.config_window.backup_location)
+
+        drive_creds = None
+        if self.config_window.drive_credentials_path:
+            drive_creds = windows_safe_path(self.config_window.drive_credentials_path)
+
+        self.signals.config.emit(sync_dir, self.config_window.sync_frequency,
+                                 self.config_window.backup_enabled, backup_dir,
+                                 self.config_window.drive_enabled, drive_creds,
+                                 self.config_window.selected_course_ids)
 
     @pyqtSlot()
     def slot_quit(self) -> None:
         self.login_window.shutdown()
         self.app.quit()
+        
+    @pyqtSlot()
+    def slot_auth_drive(self) -> None:
+        creds = None
+        if self.config_window.drive_credentials_path:
+            creds = windows_safe_path(self.config_window.drive_credentials_path)
+        self.signals.auth_drive.emit(creds)
 
     def open_settings(self, download_location: Path, username: str,
-                      sync_interval: int, version: str | None) -> None:
+                      sync_interval: int, version: str | None,
+                      backup_enabled: bool, backup_location: Path | None,
+                      drive_enabled: bool, drive_creds: Path | None,
+                      drive_email: str | None,
+                      courses: list[dict[str, str]],
+                      selected_course_ids: list[str],
+                      course_sync_status: dict) -> None:
         self.config_window.download_location = download_location
         self.config_window.username = username
         self.config_window.sync_frequency = sync_interval
         self.config_window.version = version
+        self.config_window.backup_enabled = backup_enabled
+        self.config_window.backup_location = backup_location
+        self.config_window.drive_enabled = drive_enabled
+        self.config_window.drive_credentials_path = drive_creds
+        self.config_window.set_drive_status(drive_email)
+        self.config_window.set_courses(courses, selected_course_ids, course_sync_status)
         self.show(self.config_window)
+
+    def ask_course_selection(self,
+                             courses: list[dict[str, str]],
+                             selected_course_ids: list[str],
+                             course_sync_status: dict) -> list[str] | None:
+        dialog = CourseSelectionDialog(
+            courses,
+            selected_course_ids,
+            course_sync_status,
+            self.setup_window
+        )
+        if dialog.exec():
+            return dialog.selected_course_ids
+        return None
 
     def open_menu(self, last_sync: datetime,
                   is_logged: bool, is_syncing: bool) -> None:

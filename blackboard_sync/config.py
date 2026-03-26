@@ -20,6 +20,7 @@ BlackboardSync configuration manager
 # MA  02110-1301, USA.
 
 import logging
+import json
 import configparser
 from typing import Any
 from pathlib import Path
@@ -124,3 +125,134 @@ class SyncConfig(Config):
     @Config.persist
     def min_year(self, year: int | None) -> None:
         self._sync['min_year'] = str(year or 0)
+
+    @property
+    def backup_location(self) -> Path | None:
+        """Location to backup downloaded files."""
+        return self._sync.getpath('backup_location')
+
+    @backup_location.setter
+    @Config.persist
+    def backup_location(self, backup_dir: Path | None) -> None:
+        if backup_dir is None:
+            self.remove_option('Sync', 'backup_location')
+        else:
+            self._sync['backup_location'] = str(backup_dir)
+
+    @property
+    def backup_enabled(self) -> bool:
+        """Whether backup is enabled."""
+        return self._sync.getboolean('backup_enabled', fallback=False)
+
+    @backup_enabled.setter
+    @Config.persist
+    def backup_enabled(self, enabled: bool) -> None:
+        self._sync['backup_enabled'] = str(enabled)
+
+    @property
+    def drive_enabled(self) -> bool:
+        return self._sync.getboolean('drive_enabled', fallback=False)
+
+    @drive_enabled.setter
+    @Config.persist
+    def drive_enabled(self, enabled: bool) -> None:
+        self._sync['drive_enabled'] = str(enabled)
+
+    @property
+    def drive_folder_id(self) -> str | None:
+        return self._sync.get('drive_folder_id')
+
+    @drive_folder_id.setter
+    @Config.persist
+    def drive_folder_id(self, folder_id: str | None) -> None:
+        if folder_id:
+            self._sync['drive_folder_id'] = folder_id
+        else:
+            self.remove_option('Sync', 'drive_folder_id')
+
+    @property
+    def drive_credentials_path(self) -> Path | None:
+        return self._sync.getpath('drive_credentials_path')
+
+    @drive_credentials_path.setter
+    @Config.persist
+    def drive_credentials_path(self, path: Path | None) -> None:
+        if path:
+            self._sync['drive_credentials_path'] = str(path)
+        else:
+            self.remove_option('Sync', 'drive_credentials_path')
+    
+    @property
+    def drive_token_path(self) -> Path:
+        """Path where file token.json is stored (next to config file)."""
+        return self._config_file.parent / 'token.json'
+
+    @property
+    def selected_course_ids(self) -> list[str]:
+        """Selected course ids for sync. Empty means sync all courses."""
+        raw = self._sync.get('selected_course_ids')
+        if not raw:
+            return []
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+
+        if not isinstance(parsed, list):
+            return []
+
+        return [str(course_id) for course_id in parsed if course_id]
+
+    @selected_course_ids.setter
+    @Config.persist
+    def selected_course_ids(self, course_ids: list[str]) -> None:
+        clean = sorted({str(course_id) for course_id in course_ids if course_id})
+        if clean:
+            self._sync['selected_course_ids'] = json.dumps(clean)
+        else:
+            self.remove_option('Sync', 'selected_course_ids')
+
+    @property
+    def course_sync_status(self) -> dict[str, datetime]:
+        """Course id -> last successful sync timestamp."""
+        raw = self._sync.get('course_sync_status')
+        if not raw:
+            return {}
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+
+        if not isinstance(parsed, dict):
+            return {}
+
+        status: dict[str, datetime] = {}
+        for course_id, sync_value in parsed.items():
+            if not course_id or not isinstance(sync_value, str):
+                continue
+            try:
+                status[str(course_id)] = datetime.fromisoformat(sync_value)
+            except ValueError:
+                continue
+
+        return status
+
+    @course_sync_status.setter
+    @Config.persist
+    def course_sync_status(self, status: dict[str, datetime]) -> None:
+        if not status:
+            self.remove_option('Sync', 'course_sync_status')
+            return
+
+        encoded = {
+            str(course_id): timestamp.isoformat()
+            for course_id, timestamp in status.items()
+            if course_id and isinstance(timestamp, datetime)
+        }
+
+        if encoded:
+            self._sync['course_sync_status'] = json.dumps(encoded)
+        else:
+            self.remove_option('Sync', 'course_sync_status')

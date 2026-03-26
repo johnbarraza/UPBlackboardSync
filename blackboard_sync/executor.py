@@ -42,7 +42,7 @@ class SyncExecutor(ThreadPoolExecutor):
                  cancel_futures: bool = False) -> None:
         super().shutdown(wait, cancel_futures=cancel_futures)
 
-    def raise_exceptions(self, timeout: int | None = None) -> None:
+    def raise_exceptions(self, timeout: int | None = None) -> int:
         done, not_done = wait_futures(self.futures, timeout)
 
         failed_files = 0
@@ -70,3 +70,5 @@ class SyncExecutor(ThreadPoolExecutor):
         # Only raise if session expired (critical error)
         if session_expired:
             raise BBUnauthorizedError("Session expired")
+
+        return failed_files

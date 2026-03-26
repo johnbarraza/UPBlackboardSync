@@ -1,0 +1,68 @@
+name: Release Extension
+
+on:
+  push:
+    tags:
+      - "ext-v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag for the release (example: ext-v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  package-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve tag name
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate tag prefix
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          case "$TAG" in
+            ext-v*) ;;
+            *) echo "Tag must start with ext-v"; exit 1 ;;
+          esac
+
+      - name: Set manifest version from tag
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          tag = "${{ steps.vars.outputs.tag }}"
+          version = tag.removeprefix("ext-v")
+          path = Path("extension/manifest.json")
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          manifest["version"] = version
+          path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print(f"manifest version set to {version}")
+          PY
+
+      - name: Pack extension zip
+        run: |
+          TAG="${{ steps.vars.outputs.tag }}"
+          VERSION="${TAG#ext-v}"
+          cd extension
+          zip -r "../blackboardsync-extension-${VERSION}.zip" .
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: BlackboardSync Extension ${{ steps.vars.outputs.tag }}
+          generate_release_notes: true
+          files: blackboardsync-extension-*.zip

@@ -24,6 +24,7 @@ Download your Blackboard Learn content automatically.
 import time
 import logging
 import threading
+import shutil
 from pathlib import Path
 from requests import RequestException
 from datetime import datetime, timezone, timedelta
@@ -32,10 +33,13 @@ from requests.cookies import RequestsCookieJar
 
 from blackboard.api_extended import BlackboardExtended
 from blackboard.exceptions import BBUnauthorizedError, BBForbiddenError
+from blackboard.filters import BBMembershipFilter, BWFilter
+from blackboard.blackboard import BBCourse
 
 from .config import SyncConfig
 from .download import BlackboardDownload
 from .institutions import Institution, get_by_index
+from .drive_service import DriveService
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +57,9 @@ class BlackboardSync:
 
         # Download job
         self._download: BlackboardDownload | None = None
+        
+        # Drive Service
+        self._drive_service: DriveService | None = None
 
         # Time between each sync in seconds
         self._sync_interval = 60 * 30
@@ -78,6 +85,13 @@ class BlackboardSync:
 
         # Attempt to load existing configuration
         self._config = SyncConfig()
+        
+        # Initialize Drive Service
+        creds_path = self._config.drive_credentials_path
+        token_path = self._config.drive_token_path
+        if creds_path:
+             self._drive_service = DriveService(creds_path, token_path)
+
         logger.info("Loading preexisting configuration")
 
         if self._config.university_index is not None:
@@ -101,7 +115,7 @@ class BlackboardSync:
 
         self._config.min_year = min_year
 
-    def auth(self, cookies: RequestsCookieJar) -> bool:
+    def auth(self, cookies: RequestsCookieJar, *, start_sync: bool = True) -> bool:
         """Create a new Blackboard session with the given cookies."""
         if self.university is None:
             return False
@@ -111,15 +125,10 @@ class BlackboardSync:
         try:
             u_sess = BlackboardExtended(api_url, cookies=cookies)
 
-            # Configure session timeouts for better handling of large files
-            # Set longer timeouts: 30s connect, 300s read (5 minutes)
-            if hasattr(u_sess, 'session') and hasattr(u_sess.session, 'request'):
-                original_request = u_sess.session.request
-                def request_with_timeout(*args, **kwargs):
-                    if 'timeout' not in kwargs:
-                        kwargs['timeout'] = (30, 300)  # (connect, read)
-                    return original_request(*args, **kwargs)
-                u_sess.session.request = request_with_timeout
+            # tiny_api_client reads these internal attrs for every request.
+            # Increase timeout and retries to reduce transient file failures.
+            setattr(u_sess, "__api_timeout", (30, 300))  # (connect, read)
+            setattr(u_sess, "__api_max_retries", 3)
 
             # should trigger exception if not authenticated
             u_sess.fetch_users(user_id='me')
@@ -131,7 +140,8 @@ class BlackboardSync:
             logger.info("Logged in successfully")
             self.sess = u_sess
             self._is_logged_in = True
-            self.start_sync()
+            if start_sync:
+                self.start_sync()
 
         return self._is_logged_in
 
@@ -154,7 +164,10 @@ class BlackboardSync:
             user_session,
             self.download_location,
             self.last_sync_time,
-            self.min_year
+            self.min_year,
+            set(self.selected_course_ids),
+            self.course_sync_status,
+            self._mark_course_synced
         )
 
         if not self._is_active:
@@ -162,6 +175,10 @@ class BlackboardSync:
 
         try:
             start_time = self._download.download()
+            if (start_time is None
+                    and self._download is not None
+                    and not self._download.cancelled):
+                self.schedule_next_sync(datetime.now(timezone.utc))
         except BBUnauthorizedError:
             logger.warning("Session expired - please log in again from the application")
             logger.info("Your session may have expired because you logged in from another location (browser, mobile app, etc.)")
@@ -195,6 +212,7 @@ class BlackboardSync:
 
                 if start_time is not None:
                     self.last_sync_time = start_time
+                    self._run_backup()
 
                 # Reset sync flags
                 self._force_sync = False
@@ -202,6 +220,84 @@ class BlackboardSync:
 
             if self._is_active:
                 time.sleep(self._check_sleep_time)
+
+    def _run_backup(self) -> None:
+        """Run the backup process if enabled."""
+        
+        # Local Backup
+        if self._config.backup_enabled and self._config.backup_location:
+            logger.info("Starting local backup...")
+            try:
+                shutil.copytree(
+                    self.download_location,
+                    self._config.backup_location,
+                    dirs_exist_ok=True
+                )
+                logger.info("Local backup completed successfully")
+            except Exception:
+                logger.exception("Error during local backup")
+
+        # Drive Backup
+        if self._config.drive_enabled and self._drive_service:
+            logger.info("Starting Drive backup...")
+            try:
+                if self._drive_service.authenticates():
+                    root_name = "BlackboardSync"
+                    folder_id = self._config.drive_folder_id
+
+                    if folder_id and not self._drive_service.folder_exists(folder_id):
+                        logger.warning("Stored Drive folder is no longer accessible; recreating root backup folder")
+                        self._config.drive_folder_id = None
+                        folder_id = None
+
+                    if folder_id is None:
+                        folder_id = self._drive_service.ensure_folder(root_name)
+                        if folder_id:
+                            self._config.drive_folder_id = folder_id
+
+                    if folder_id is None:
+                        logger.error("Could not determine Drive folder")
+                        return
+
+                    self._drive_service.mirror_tree(self.download_location, folder_id)
+                    logger.info("Drive backup completed successfully")
+            except Exception:
+                 logger.exception("Error during Drive backup")
+
+    def _mark_course_synced(self, course_id: str, sync_time: datetime) -> None:
+        status = self._config.course_sync_status
+        status[course_id] = sync_time
+        self._config.course_sync_status = status
+
+    def list_available_courses(self) -> list[BBCourse]:
+        if self.sess is None:
+            return []
+
+        membership_filter = BBMembershipFilter(
+            min_year=self._config.min_year,
+            data_sources=BWFilter()
+        )
+        try:
+            return self.sess.ex_fetch_courses(
+                user_id=self.sess.user_id,
+                result_filter=membership_filter
+            )
+        except RequestException:
+            logger.warning("Could not fetch course list for settings")
+        except Exception:
+            logger.exception("Unexpected error while fetching course list for settings")
+        return []
+
+    def list_available_courses_summary(self) -> list[dict[str, str]]:
+        courses = self.list_available_courses()
+        summary: list[dict[str, str]] = []
+        for course in courses:
+            title = course.title or course.name or course.id
+            summary.append({
+                'id': course.id,
+                'name': title,
+            })
+        return summary
 
     def start_sync(self) -> bool:
         """Starts Sync thread or returns False if not possible."""
@@ -247,6 +343,18 @@ class BlackboardSync:
 
     def redownload(self) -> None:
         self.last_sync_time = None
+
+    @property
+    def selected_course_ids(self) -> list[str]:
+        return self._config.selected_course_ids
+
+    @selected_course_ids.setter
+    def selected_course_ids(self, value: list[str]) -> None:
+        self._config.selected_course_ids = value
+
+    @property
+    def course_sync_status(self) -> dict[str, datetime]:
+        return self._config.course_sync_status
 
     @property
     def username(self) -> str | None:
@@ -303,6 +411,69 @@ class BlackboardSync:
         if value != self.download_location:
             self._config.download_location = value
             self._add_logger_file_handler()
+
+    @property
+    def backup_location(self) -> Path | None:
+        """Location to backup downloaded files."""
+        return self._config.backup_location
+
+    @backup_location.setter
+    def backup_location(self, value: Path | None) -> None:
+        self._config.backup_location = value
+
+    @property
+    def backup_enabled(self) -> bool:
+        """Whether backup is enabled."""
+        return self._config.backup_enabled
+
+    @backup_enabled.setter
+    def backup_enabled(self, value: bool) -> None:
+        self._config.backup_enabled = value
+
+    @property
+    def drive_enabled(self) -> bool:
+         return self._config.drive_enabled
+
+    @drive_enabled.setter
+    def drive_enabled(self, value: bool) -> None:
+        self._config.drive_enabled = value
+
+    @property
+    def drive_credentials_path(self) -> Path | None:
+        return self._config.drive_credentials_path
+
+    @drive_credentials_path.setter
+    def drive_credentials_path(self, value: str | None) -> None:
+        current = self._config.drive_credentials_path
+        path = Path(value) if value else None
+        self._config.drive_credentials_path = path
+        token_path = self._config.drive_token_path
+
+        if current != path:
+            self._config.drive_folder_id = None
+
+            if token_path.exists():
+                try:
+                    token_path.unlink()
+                except OSError:
+                    logger.exception("Failed to clear stale Drive token at %s", token_path)
+
+        self._drive_service = DriveService(path, token_path) if path else None
+    
+    @property
+    def drive_email(self) -> str | None:
+        if self._drive_service and self._drive_service.creds: # Check if authenticated
+             return self._drive_service.get_user_email()
+        return None
+
+    def authenticate_drive(self) -> bool:
+        """Trigger interactive authentication."""
+        if not self._drive_service:
+            if not self.drive_credentials_path:
+                return False
+            self._drive_service = DriveService(self.drive_credentials_path, self._config.drive_token_path)
+            
+        return self._drive_service.authenticates()
 
     @property
     def sync_interval(self) -> int:

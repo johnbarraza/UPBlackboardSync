@@ -50,7 +50,8 @@ class ContentParser:
         if find_links:
             a = self._find_replace(soup, 'a', 'href', base_url)
             img = self._find_replace(soup, 'img', 'src', base_url)
-            self._links = [*a, *img]
+            iframe = self._find_replace(soup, 'iframe', 'src', base_url)
+            self._links = [*a, *img, *iframe]
 
         self._body = str(soup)
         self._text = soup.text
@@ -76,7 +77,13 @@ class ContentParser:
                         if candidate and not candidate.lower().startswith('xid'):
                             display = candidate
 
-                # Priority 2: Check aria-controls for filename extraction
+                # Priority 2: use element title (e.g., iframe title in Ultra inline previews)
+                if not display:
+                    title_attr = (el.get('title') or '').strip()
+                    if title_attr and not title_attr.lower().startswith('xid'):
+                        display = title_attr
+
+                # Priority 3: Check aria-controls for filename extraction
                 if not display:
                     aria_controls = el.get('aria-controls', '')
                     if 'xid-' in aria_controls:
@@ -91,13 +98,13 @@ class ContentParser:
                                     display = qs[key][0]
                                     break
 
-                # Priority 3: Use visible text if present and meaningful
+                # Priority 4: Use visible text if present and meaningful
                 if not display:
                     text_val = (el.text or '').strip()
                     if text_val and not text_val.lower().startswith('xid'):
                         display = text_val
 
-                # Priority 4: Parse URL and extract sensible filename
+                # Priority 5: Parse URL and extract sensible filename
                 if not display:
                     parsed = urlparse(uri)
                     last = unquote(os.path.basename(parsed.path))

@@ -17,9 +17,21 @@
 
 import webbrowser
 from pathlib import Path
+from datetime import datetime
 
-from PyQt6.QtCore import QObject
-from PyQt6.QtWidgets import QMessageBox, QFileDialog
+from PyQt6.QtCore import QObject, Qt
+from PyQt6.QtWidgets import (
+    QMessageBox,
+    QFileDialog,
+    QDialog,
+    QDialogButtonBox,
+    QVBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QHBoxLayout,
+)
 
 from .assets import logo
 
@@ -34,6 +46,114 @@ class DirDialog(QFileDialog):
         if super().exec():
             return Path(self.directory().path())
         return None
+
+
+class FileDialog(QFileDialog):
+    """Open the file dialog in existing-file mode."""
+
+    def open(self, file_filter: str = "") -> tuple[str, str]:
+        self.setFileMode(QFileDialog.FileMode.ExistingFile)
+        if file_filter:
+            self.setNameFilter(file_filter)
+
+        if super().exec():
+            selected = self.selectedFiles()
+            if selected:
+                return selected[0], self.selectedNameFilter()
+
+        return "", self.selectedNameFilter()
+
+
+class CourseSelectionDialog(QDialog):
+    def __init__(self,
+                 courses: list[dict[str, str]],
+                 selected_course_ids: list[str],
+                 course_sync_status: dict[str, datetime],
+                 parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Select courses to sync"))
+        self.setWindowIcon(logo())
+        self.resize(620, 460)
+
+        self._list = QListWidget(self)
+        selected = set(selected_course_ids)
+
+        for course in courses:
+            course_id = course.get('id', '')
+            course_name = course.get('name', course_id)
+            synced = course_sync_status.get(course_id)
+            synced_label = (
+                synced.astimezone().strftime('%Y-%m-%d %H:%M')
+                if synced else self.tr("Never")
+            )
+            text = f"{course_name}  |  {self.tr('Last sync')}: {synced_label}"
+
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, course_id)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                Qt.CheckState.Checked
+                if (not selected or course_id in selected)
+                else Qt.CheckState.Unchecked
+            )
+            self._list.addItem(item)
+
+        info = QLabel(self.tr("Choose which courses should be synchronized."))
+        info.setWordWrap(True)
+
+        select_all_button = QPushButton(self.tr("Select all"))
+        select_all_button.clicked.connect(self._select_all)
+
+        clear_button = QPushButton(self.tr("Clear"))
+        clear_button.clicked.connect(self._clear)
+
+        action_row = QHBoxLayout()
+        action_row.addWidget(select_all_button)
+        action_row.addWidget(clear_button)
+        action_row.addStretch(1)
+
+        self._buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        self._buttons.accepted.connect(self._try_accept)
+        self._buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addWidget(info)
+        layout.addLayout(action_row)
+        layout.addWidget(self._list)
+        layout.addWidget(self._buttons)
+        self.setLayout(layout)
+
+    @property
+    def selected_course_ids(self) -> list[str]:
+        selected: list[str] = []
+        for i in range(self._list.count()):
+            item = self._list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                course_id = item.data(Qt.ItemDataRole.UserRole)
+                if course_id:
+                    selected.append(str(course_id))
+        return selected
+
+    def _select_all(self) -> None:
+        for i in range(self._list.count()):
+            self._list.item(i).setCheckState(Qt.CheckState.Checked)
+
+    def _clear(self) -> None:
+        for i in range(self._list.count()):
+            self._list.item(i).setCheckState(Qt.CheckState.Unchecked)
+
+    def _try_accept(self) -> None:
+        if not self.selected_course_ids:
+            QMessageBox.warning(
+                self,
+                self.tr("No courses selected"),
+                self.tr("Select at least one course to continue.")
+            )
+            return
+        self.accept()
 
 
 class Dialogs(QObject):

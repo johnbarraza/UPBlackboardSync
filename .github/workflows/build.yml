@@ -15,6 +15,7 @@ env:
 
 jobs:
   test:
+    if: ${{ !startsWith(github.ref_name, 'ext-v') }}
     uses: ./.github/workflows/pytest.yml
     with:
       python-version: "3.11.9"

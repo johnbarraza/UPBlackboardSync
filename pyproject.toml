@@ -32,7 +32,9 @@ dependencies = [
     "packaging>=23.1",
     "bblearn>=0.3.0",
     "whoisit",
-    "bwfilters"
+    "bwfilters",
+    "google-api-python-client>=2.0.0",
+    "google-auth-oauthlib>=1.0.0"
 ]
 
 [project.scripts]

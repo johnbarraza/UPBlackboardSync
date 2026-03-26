@@ -1,7 +1,7 @@
 # UP BlackboardSync
 ### Automatic Downloads Of Your Blackboard Content
 This is a fork for the Universidad del Pacifico (Peru)
-[![Get on PyPI][pypi-shield]][pypi] [![License: GPL  v2][license-shield]][gnu] [![Build][build-shield]][actions] [![Matrix][matrix-shield]][matrix]
+[![Get on PyPI][pypi-shield]][pypi] [![License: GPL  v2][license-shield]][gnu] [![Build][build-shield]][actions] [![GitHub Downloads][downloads-shield]][releases] [![Latest Release][latest-shield]][stable] [![Matrix][matrix-shield]][matrix]
 
 **BlackboardSync** performs a periodic,
 incremental download of all your Blackboard content,
@@ -84,8 +84,6 @@ You will need to confirm the installation in `System Preferences > Security and 
 You can see the specific steps in the GIF below.
 After the program has been installed, you may eject the mounted disk.
 
-![MacOSInstall][MacOSInstall]
-
 
 #### PyPI
 
@@ -108,6 +106,22 @@ pipenv run python -m blackboard_sync
 #### Previous Releases
 
 You can find all releases on [GitHub][releases].
+
+## Release Workflows
+
+Releases are created by GitHub Actions workflows:
+
+- Desktop app release workflow: [build.yml][desktop-workflow]
+  - Trigger: push tag like `0.20.0` or `0.20.0-rc.1`
+  - Output: desktop artifacts (`.exe`, `.dmg`) and GitHub Release assets
+- Extension assets for desktop releases: [release-extension-assets.yml][ext-assets-workflow]
+  - Trigger: same desktop tags (`0.20.0`, `0.20.0-rc.1`, etc.)
+  - Output: Chrome (`.zip`) and Firefox (`.xpi`) extension files attached to the same release
+- Browser extension release workflow: [release-extension.yml][ext-workflow]
+  - Trigger: push tag like `ext-v0.1.0`
+  - Output: `blackboardsync-extension-<version>.zip` as a GitHub Release asset
+
+Download counters are shown in the `GitHub Downloads` badge above and update automatically from GitHub release stats.
 
 
 ## Contributions
@@ -169,11 +183,25 @@ Flathub team for their quick work in approving the app :heart:
 
 [matrix]: https://matrix.to/#/#blackboardsync:matrix.org
 [matrix-shield]: https://img.shields.io/matrix/blackboardsync%3Amatrix.org?logo=matrix
+[actions]: https://github.com/johnbarraza/UPBlackboardSync/actions
+[build-shield]: https://img.shields.io/github/actions/workflow/status/johnbarraza/UPBlackboardSync/build.yml?branch=main&label=build
+[desktop-workflow]: https://github.com/johnbarraza/UPBlackboardSync/blob/main/.github/workflows/build.yml
+[ext-assets-workflow]: https://github.com/johnbarraza/UPBlackboardSync/blob/main/.github/workflows/release-extension-assets.yml
+[ext-workflow]: https://github.com/johnbarraza/UPBlackboardSync/blob/main/.github/workflows/release-extension.yml
+[downloads-shield]: https://img.shields.io/github/downloads/johnbarraza/UPBlackboardSync/total?label=github%20downloads
+[latest-shield]: https://img.shields.io/github/v/release/johnbarraza/UPBlackboardSync?display_name=tag
 
 <!-- Packages -->
 
 [pypi]: https://pypi.org/project/blackboardsync
 [pypi-shield]: https://img.shields.io/pypi/v/BlackboardSync?color=%23241F21
+[stable]: https://github.com/johnbarraza/UPBlackboardSync/releases/latest
+[releases]: https://github.com/johnbarraza/UPBlackboardSync/releases
+[issues]: https://github.com/johnbarraza/UPBlackboardSync/issues
+[kofi]: https://ko-fi.com/sanjacob
+[kofi-shield]: https://img.shields.io/badge/ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white
+[liberapay]: https://liberapay.com/sanjacob
+[lp-shield]: https://img.shields.io/liberapay/receives/sanjacob
 
 
 <!-- Licence -->
