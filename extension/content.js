@@ -61,6 +61,16 @@
     if (m && m[1]) {
       return m[1].trim();
     }
+    const m2 = clean.match(
+      /(20\d{2}\s*[-_/]\s*(?:0?[1-9]|1[0-2])(?:\s*[-_/]\s*[A-Za-z]{2,})?)/i
+    );
+    if (m2 && m2[1]) {
+      return m2[1].replace(/\s+/g, "");
+    }
+    const m3 = clean.match(/(20\d{2}\s*[-_/]\s*[A-Za-z]{2,})/i);
+    if (m3 && m3[1]) {
+      return m3[1].replace(/\s+/g, "");
+    }
     return "No term";
   }
 
@@ -78,30 +88,97 @@
 
   function cleanCourseName(raw) {
     let value = sanitizeName(String(raw || "").replace(/\s+/g, " "));
+    value = value.replace(/^Skip to course information\s*/i, "").trim();
     value = value.replace(/^Skip to main content\s*/i, "").trim();
     value = value.replace(/\s*\|\s*(active|past)\s*$/i, "").trim();
+    if (value.includes("|")) {
+      const parts = value
+        .split("|")
+        .map((p) => p.trim())
+        .filter(Boolean);
+      const good = parts.find(
+        (p) => !/^(active|past)$/i.test(p) && !/^_\d+_1$/i.test(p)
+      );
+      if (good) {
+        value = good;
+      }
+    }
+    if (/^Skip to /i.test(value)) {
+      return "";
+    }
     if (/^_\d+_1$/i.test(value)) {
       return "";
     }
     return value;
   }
 
+  function isWeakCourseName(name, courseId) {
+    const n = String(name || "").trim();
+    if (!n) {
+      return true;
+    }
+    if (n === courseId) {
+      return true;
+    }
+    if (/^skip to /i.test(n)) {
+      return true;
+    }
+    if (/^_\d+_1$/i.test(n)) {
+      return true;
+    }
+    return false;
+  }
+
+  function inferTermFromNode(node, courseName) {
+    const fromName = parseTermFromText(courseName);
+    if (fromName !== "No term") {
+      return fromName;
+    }
+    const card = node.closest(
+      "[data-course-id],[data-courseid],[class*='course-card'],[class*='courseCard'],li,article,div"
+    );
+    const fromCard = parseTermFromText(card && card.textContent ? card.textContent : "");
+    return fromCard;
+  }
+
   function inferCourseNameFromNode(node, url) {
+    const courseId = parseCourseId(url);
+    const card = node.closest(
+      "[data-course-id],[data-courseid],[class*='course-card'],[class*='courseCard'],li,article,div"
+    );
     const titleNode =
       node.querySelector("[data-qa='course-title']") ||
       node.querySelector("[data-testid*='course-title']") ||
       node.querySelector("h1,h2,h3,h4");
 
-    const title =
+    const cardTitleNode = card
+      ? card.querySelector(
+        "[data-qa='course-title'],[data-testid*='course-title'],h1,h2,h3,h4,[class*='course-title'],[class*='courseTitle']"
+      )
+      : null;
+
+    const candidates = [
       node.getAttribute("data-course-title") ||
       node.getAttribute("title") ||
       node.getAttribute("aria-label") ||
       (titleNode && titleNode.textContent) ||
-      node.textContent ||
-      document.title ||
-      parseCourseId(url);
+      "",
+      card && card.getAttribute("title"),
+      card && card.getAttribute("aria-label"),
+      cardTitleNode && cardTitleNode.textContent,
+      node.textContent,
+      card && card.textContent,
+      document.title
+    ];
 
-    return cleanCourseName(title) || parseCourseId(url);
+    for (const candidate of candidates) {
+      const name = cleanCourseName(candidate);
+      if (!isWeakCourseName(name, courseId)) {
+        return name;
+      }
+    }
+
+    return courseId;
   }
 
   function getCurrentCourseTitle(courseId) {
@@ -177,7 +254,7 @@
       const fallbackUrl =
         url || `${location.origin}/ultra/courses/${encodeURIComponent(courseId)}/outline`;
       const name = inferCourseNameFromNode(node, fallbackUrl);
-      const term = parseTermFromText(name);
+      const term = inferTermFromNode(node, name);
       const status = inferStatus(term, name);
 
       if (!found.has(courseId)) {
@@ -192,6 +269,20 @@
       }
 
       const current = found.get(courseId);
+      if (current && isWeakCourseName(current.name, courseId)) {
+        if (!isWeakCourseName(name, courseId)) {
+          current.name = name;
+        }
+      }
+      if (current && (current.term === "No term")) {
+        const betterTerm = inferTermFromNode(node, name);
+        if (betterTerm !== "No term") {
+          current.term = betterTerm;
+        }
+      }
+      if (current && current.status === "active") {
+        current.status = inferStatus(current.term, current.name);
+      }
       if (current && current.name === courseId && name !== courseId) {
         current.name = name;
       }
