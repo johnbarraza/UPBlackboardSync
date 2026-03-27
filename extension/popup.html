@@ -51,6 +51,13 @@
       border-radius: 8px;
       padding: 8px;
     }
+    select {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      background: #fff;
+      color: var(--text);
+    }
     button {
       border: 1px solid var(--primary);
       background: var(--primary);
@@ -113,10 +120,19 @@
   <div class="card">
     <div class="row">
       <input id="search" type="text" placeholder="Search courses..." />
+      <label>
+        Cycle
+        <select id="cycle-filter">
+          <option value="__current__">Current (auto)</option>
+          <option value="__all__">All cycles</option>
+          <option value="__none__">No cycle</option>
+        </select>
+      </label>
       <label><input id="show-active" type="checkbox" checked /> Active</label>
       <label><input id="show-past" type="checkbox" checked /> Past</label>
     </div>
     <div class="row" style="margin-top:8px;">
+      <button id="refresh-courses" class="secondary">Refresh</button>
       <button id="select-all" class="secondary">Select all</button>
       <button id="clear-all" class="secondary">Clear</button>
       <button id="open-settings" class="secondary">Settings</button>

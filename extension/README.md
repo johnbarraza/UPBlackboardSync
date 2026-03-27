@@ -5,7 +5,9 @@ A browser-based course archiver for Blackboard, inspired by Canvas-style downloa
 ## Features (Current)
 
 - Select one or multiple courses discovered from your Blackboard dashboard/page.
+- Manual Refresh button to re-read course cards from the current screen.
 - Active/past filtering with search in the course selector.
+- Cycle filter: Current (auto), all cycles, no cycle, or specific detected cycle.
 - Export presets:
   - Essentials (PDF + Announcements)
   - Full Archive

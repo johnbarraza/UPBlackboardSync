@@ -55,35 +55,130 @@
     return "";
   }
 
+  const PAST_KEYWORDS_RE = /\b(past|pasado|previous|closed|inactive|ended|completed|archive|archived|finalizado|cerrado)\b/i;
+  const ACTIVE_KEYWORDS_RE = /\b(active|current|ongoing|actual|en curso|vigente|open|abierto)\b/i;
+  const TERM_HINT_RE = /\b(19\d{2}|20\d{2}|semester|semestre|term|ciclo|periodo|period|quarter|trimestre|spring|summer|fall|autumn|winter|primavera|verano|otono|invierno)\b/i;
+
+  function normalizeText(input) {
+    return String(input || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function cleanTermLabel(value) {
+    return String(value || "")
+      .replace(/^[\s\-:|,;]+/, "")
+      .replace(/[\s\-:|,;]+$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function rankedTerm(term) {
+    const raw = cleanTermLabel(term);
+    if (!raw || /^no term$/i.test(raw)) {
+      return null;
+    }
+
+    const normalized = normalizeText(raw).toUpperCase();
+    const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
+    if (!yearMatch) {
+      return null;
+    }
+
+    const year = Number(yearMatch[1]);
+    const full = ` ${normalized} `;
+    let period = 0;
+
+    const semesterMatch = full.match(/\b(SEMESTER|SEMESTRE|TERM|TRIMESTRE|QUARTER|Q|CICLO)\s*([1-6])\b/);
+    if (semesterMatch) {
+      period = Number(semesterMatch[2]);
+    } else {
+      const romanMatch = full.match(/\b(IV|III|II|I)\b/);
+      if (romanMatch) {
+        period = { I: 1, II: 2, III: 3, IV: 4 }[romanMatch[1]] || 0;
+      } else if (/\b(FALL|AUTUMN|OTONO)\b/.test(full)) {
+        period = 3;
+      } else if (/\b(SUMMER|VERANO)\b/.test(full)) {
+        period = 2;
+      } else if (/\b(SPRING|PRIMAVERA)\b/.test(full)) {
+        period = 1;
+      } else if (/\b(WINTER|INVIERNO)\b/.test(full)) {
+        period = 0;
+      } else {
+        const afterYear = normalized.slice(normalized.indexOf(yearMatch[1]) + 4);
+        const numberMatch = afterYear.match(/[\/\-_ ](0?[1-9]|1[0-2])(?:\b|[\/\-_ ])/);
+        if (numberMatch) {
+          period = Number(numberMatch[1]);
+        }
+      }
+    }
+
+    return {
+      score: year * 100 + period,
+      token: `rank:${year * 100 + period}`
+    };
+  }
+
   function parseTermFromText(text) {
-    const clean = String(text || "");
-    const m = clean.match(/\(([^)]+)\)\s*$/);
-    if (m && m[1]) {
-      return m[1].trim();
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    if (!clean) {
+      return "No term";
     }
-    const m2 = clean.match(
-      /(20\d{2}\s*[-_/]\s*(?:0?[1-9]|1[0-2])(?:\s*[-_/]\s*[A-Za-z]{2,})?)/i
-    );
-    if (m2 && m2[1]) {
-      return m2[1].replace(/\s+/g, "");
+
+    const candidates = [];
+    for (const match of clean.matchAll(/\(([^)]+)\)/g)) {
+      if (match[1]) {
+        candidates.push(match[1]);
+      }
     }
-    const m3 = clean.match(/(20\d{2}\s*[-_/]\s*[A-Za-z]{2,})/i);
-    if (m3 && m3[1]) {
-      return m3[1].replace(/\s+/g, "");
+
+    const patterns = [
+      /((?:19|20)\d{2}\s*[-/_ ]\s*(?:0?[1-9]|1[0-2]|I{1,3}|IV|V|A|B|C|D|SPRING|SUMMER|FALL|AUTUMN|WINTER|PRIMAVERA|VERANO|OTONO|INVIERNO))/ig,
+      /((?:SEMESTER|SEMESTRE|TERM|CICLO|PERIODO|QUARTER|TRIMESTRE)\s*[A-Z0-9IVX]+)/ig,
+      /((?:19|20)\d{2}\s*(?:SPRING|SUMMER|FALL|AUTUMN|WINTER|PRIMAVERA|VERANO|OTONO|INVIERNO))/ig
+    ];
+    for (const pattern of patterns) {
+      for (const match of clean.matchAll(pattern)) {
+        if (match[1]) {
+          candidates.push(match[1]);
+        }
+      }
     }
+
+    for (const candidate of candidates) {
+      if (!TERM_HINT_RE.test(candidate)) {
+        continue;
+      }
+      const label = cleanTermLabel(candidate);
+      if (!label) {
+        continue;
+      }
+      return label;
+    }
+
     return "No term";
   }
 
   function inferStatus(term, courseName) {
-    const lower = `${term} ${courseName}`.toLowerCase();
-    if (lower.includes("past") || lower.includes("pasado") || lower.includes("previous")) {
-      return "past";
+    const lower = normalizeText(`${term} ${courseName}`).toLowerCase();
+    if (PAST_KEYWORDS_RE.test(lower)) {
+      return { status: "past", source: "keyword-past" };
     }
-    const y = lower.match(/(20\d{2})/);
-    if (y && Number(y[1]) < new Date().getFullYear()) {
-      return "past";
+    if (ACTIVE_KEYWORDS_RE.test(lower)) {
+      return { status: "active", source: "keyword-active" };
     }
-    return "active";
+
+    const rank = rankedTerm(term);
+    if (rank) {
+      const year = Math.floor(rank.score / 100);
+      if (year < new Date().getFullYear()) {
+        return { status: "past", source: "year" };
+      }
+    }
+
+    return { status: "active", source: "default" };
   }
 
   function cleanCourseName(raw) {
@@ -130,15 +225,35 @@
   }
 
   function inferTermFromNode(node, courseName) {
-    const fromName = parseTermFromText(courseName);
-    if (fromName !== "No term") {
-      return fromName;
-    }
     const card = node.closest(
       "[data-course-id],[data-courseid],[class*='course-card'],[class*='courseCard'],li,article,div"
     );
-    const fromCard = parseTermFromText(card && card.textContent ? card.textContent : "");
-    return fromCard;
+
+    const sources = [
+      courseName,
+      node.getAttribute("data-term"),
+      node.getAttribute("data-term-name"),
+      node.getAttribute("data-period"),
+      node.getAttribute("data-semester"),
+      node.getAttribute("aria-label"),
+      node.getAttribute("title"),
+      card && card.getAttribute("data-term"),
+      card && card.getAttribute("data-term-name"),
+      card && card.getAttribute("data-period"),
+      card && card.getAttribute("data-semester"),
+      card && card.getAttribute("aria-label"),
+      card && card.getAttribute("title"),
+      card && card.textContent,
+      node.textContent
+    ];
+
+    for (const source of sources) {
+      const term = parseTermFromText(source || "");
+      if (term !== "No term") {
+        return term;
+      }
+    }
+    return "No term";
   }
 
   function inferCourseNameFromNode(node, url) {
@@ -211,6 +326,58 @@
     return courseId;
   }
 
+  function reconcileCourseStatuses(coursesList) {
+    const enriched = coursesList.map((course) => {
+      const rank = rankedTerm(course.term);
+      return {
+        ...course,
+        termRank: rank ? rank.score : null,
+        termToken: rank ? rank.token : null
+      };
+    });
+
+    let currentScore = null;
+    for (const course of enriched) {
+      if (typeof course.termRank !== "number") {
+        continue;
+      }
+      if (course.status === "active" && (currentScore === null || course.termRank > currentScore)) {
+        currentScore = course.termRank;
+      }
+    }
+    if (currentScore === null) {
+      for (const course of enriched) {
+        if (typeof course.termRank !== "number") {
+          continue;
+        }
+        if (currentScore === null || course.termRank > currentScore) {
+          currentScore = course.termRank;
+        }
+      }
+    }
+
+    for (const course of enriched) {
+      if (course.statusSource === "keyword-past") {
+        course.status = "past";
+        continue;
+      }
+      if (typeof course.termRank === "number" && currentScore !== null) {
+        course.status = course.termRank < currentScore ? "past" : "active";
+      } else if (!course.status) {
+        course.status = "active";
+      }
+    }
+
+    return enriched.map((course) => ({
+      id: course.id,
+      name: course.name,
+      url: course.url,
+      term: course.term,
+      status: course.status,
+      termRank: course.termRank
+    }));
+  }
+
   function discoverCoursesFromDom() {
     const found = new Map();
     const candidates = [
@@ -255,7 +422,7 @@
         url || `${location.origin}/ultra/courses/${encodeURIComponent(courseId)}/outline`;
       const name = inferCourseNameFromNode(node, fallbackUrl);
       const term = inferTermFromNode(node, name);
-      const status = inferStatus(term, name);
+      const statusInfo = inferStatus(term, name);
 
       if (!found.has(courseId)) {
         found.set(courseId, {
@@ -263,7 +430,8 @@
           name,
           url: fallbackUrl,
           term,
-          status
+          status: statusInfo.status,
+          statusSource: statusInfo.source
         });
         continue;
       }
@@ -281,7 +449,9 @@
         }
       }
       if (current && current.status === "active") {
-        current.status = inferStatus(current.term, current.name);
+        const currentStatusInfo = inferStatus(current.term, current.name);
+        current.status = currentStatusInfo.status;
+        current.statusSource = currentStatusInfo.source;
       }
       if (current && current.name === courseId && name !== courseId) {
         current.name = name;
@@ -294,16 +464,19 @@
     const currentId = parseCourseId(location.href);
     if (currentId && !found.has(currentId)) {
       const currentName = getCurrentCourseTitle(currentId);
+      const currentTerm = parseTermFromText(currentName);
+      const currentStatusInfo = inferStatus(currentTerm, currentName);
       found.set(currentId, {
         id: currentId,
         name: currentName,
         url: location.href,
-        term: parseTermFromText(currentName),
-        status: inferStatus(parseTermFromText(currentName), currentName)
+        term: currentTerm,
+        status: currentStatusInfo.status,
+        statusSource: currentStatusInfo.source
       });
     }
 
-    return Array.from(found.values());
+    return reconcileCourseStatuses(Array.from(found.values()));
   }
 
   function filenameFromUrl(rawUrl) {
