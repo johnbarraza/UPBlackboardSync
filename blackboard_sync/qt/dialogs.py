@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QListWidgetItem,
     QPushButton,
     QHBoxLayout,
+    QWidget,
 )
 
 from .assets import logo
@@ -51,7 +52,7 @@ class DirDialog(QFileDialog):
 class FileDialog(QFileDialog):
     """Open the file dialog in existing-file mode."""
 
-    def open(self, file_filter: str = "") -> tuple[str, str]:
+    def choose(self, file_filter: str = "") -> tuple[str, str]:
         self.setFileMode(QFileDialog.FileMode.ExistingFile)
         if file_filter:
             self.setNameFilter(file_filter)
@@ -69,7 +70,7 @@ class CourseSelectionDialog(QDialog):
                  courses: list[dict[str, str]],
                  selected_course_ids: list[str],
                  course_sync_status: dict[str, datetime],
-                 parent=None) -> None:
+                 parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(self.tr("Select courses to sync"))
         self.setWindowIcon(logo())
@@ -131,6 +132,8 @@ class CourseSelectionDialog(QDialog):
         selected: list[str] = []
         for i in range(self._list.count()):
             item = self._list.item(i)
+            if item is None:
+                continue
             if item.checkState() == Qt.CheckState.Checked:
                 course_id = item.data(Qt.ItemDataRole.UserRole)
                 if course_id:
@@ -139,11 +142,17 @@ class CourseSelectionDialog(QDialog):
 
     def _select_all(self) -> None:
         for i in range(self._list.count()):
-            self._list.item(i).setCheckState(Qt.CheckState.Checked)
+            item = self._list.item(i)
+            if item is None:
+                continue
+            item.setCheckState(Qt.CheckState.Checked)
 
     def _clear(self) -> None:
         for i in range(self._list.count()):
-            self._list.item(i).setCheckState(Qt.CheckState.Unchecked)
+            item = self._list.item(i)
+            if item is None:
+                continue
+            item.setCheckState(Qt.CheckState.Unchecked)
 
     def _try_accept(self) -> None:
         if not self.selected_course_ids:

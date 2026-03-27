@@ -211,7 +211,7 @@ class UIManager(QObject):
                       drive_email: str | None,
                       courses: list[dict[str, str]],
                       selected_course_ids: list[str],
-                      course_sync_status: dict) -> None:
+                      course_sync_status: dict[str, datetime]) -> None:
         self.config_window.download_location = download_location
         self.config_window.username = username
         self.config_window.sync_frequency = sync_interval
@@ -231,7 +231,8 @@ class UIManager(QObject):
     def ask_course_selection(self,
                              courses: list[dict[str, str]],
                              selected_course_ids: list[str],
-                             course_sync_status: dict) -> list[str] | None:
+                             course_sync_status: dict[str, datetime]
+                             ) -> list[str] | None:
         dialog = CourseSelectionDialog(
             courses,
             selected_course_ids,

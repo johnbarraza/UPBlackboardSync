@@ -122,7 +122,7 @@ class SettingsWindow(QWidget):
 
     @pyqtSlot()
     def _choose_credentials(self) -> None:
-        file, _ = FileDialog().open("JSON Files (*.json)")
+        file, _ = FileDialog().choose("JSON Files (*.json)")
         if file:
             self.drive_credentials_path = Path(file)
 
