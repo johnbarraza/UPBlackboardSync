@@ -7,6 +7,7 @@ A browser-based course archiver for Blackboard, inspired by Canvas-style downloa
 - Select one or multiple courses discovered from your Blackboard dashboard/page.
 - Active/past filtering with search in the course selector.
 - Export presets:
+  - Essentials (PDF + Announcements)
   - Full Archive
   - Files Only
   - Text Content Only

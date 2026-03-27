@@ -1,4 +1,18 @@
 const PRESETS = {
+  essentials: {
+    contentTypes: {
+      filesFolders: true,
+      pages: false,
+      assignments: false,
+      discussions: false,
+      announcements: true,
+      modules: false,
+      syllabus: false,
+      gradesCsv: false,
+      linkedExtracted: true,
+      text: true
+    }
+  },
   full_archive: {
     contentTypes: {
       filesFolders: true,
@@ -60,16 +74,16 @@ const PRESETS = {
 const DEFAULT_SETTINGS = {
   universityLabel: "",
   preferredHost: "",
-  exportPreset: "full_archive",
+  exportPreset: "essentials",
   contentTypes: {
     filesFolders: true,
-    pages: true,
-    assignments: true,
-    discussions: true,
+    pages: false,
+    assignments: false,
+    discussions: false,
     announcements: true,
-    modules: true,
-    syllabus: true,
-    gradesCsv: true,
+    modules: false,
+    syllabus: false,
+    gradesCsv: false,
     linkedExtracted: true,
     text: true
   },

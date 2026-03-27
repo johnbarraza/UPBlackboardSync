@@ -1,4 +1,16 @@
 const PRESETS = {
+  essentials: {
+    filesFolders: true,
+    pages: false,
+    assignments: false,
+    discussions: false,
+    announcements: true,
+    modules: false,
+    syllabus: false,
+    gradesCsv: false,
+    linkedExtracted: true,
+    text: true
+  },
   full_archive: {
     filesFolders: true,
     pages: true,
@@ -52,8 +64,8 @@ const PRESETS = {
 const DEFAULT_SETTINGS = {
   universityLabel: "",
   preferredHost: "",
-  exportPreset: "full_archive",
-  contentTypes: { ...PRESETS.full_archive },
+  exportPreset: "essentials",
+  contentTypes: { ...PRESETS.essentials },
   conflictHandling: "uniquify",
   delayMs: 250,
   folderPrefix: "",
