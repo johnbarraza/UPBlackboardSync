@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BlackboardSync Extension Settings</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f7f8fb;
+      color: #0f172a;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+    }
+    .desc {
+      margin-bottom: 14px;
+      color: #475569;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #dbe2f0;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 8px 16px;
+    }
+    label {
+      display: block;
+      margin: 6px 0;
+      font-size: 14px;
+    }
+    input[type="number"],
+    input[type="text"],
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #ccd8ef;
+      border-radius: 8px;
+      padding: 8px;
+      margin-top: 4px;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    button {
+      border: 1px solid #0b57d0;
+      background: #0b57d0;
+      color: #fff;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary {
+      background: #fff;
+      color: #0b57d0;
+    }
+    #status {
+      color: #163161;
+      font-size: 13px;
+      white-space: pre-wrap;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>BlackboardSync Extension Settings</h1>
+    <div class="desc">Presets, content selection, incremental mode, and ZIP bundling.</div>
+
+    <div class="card">
+      <h3>Export Preset</h3>
+      <label>
+        Preset
+        <select id="export-preset">
+          <option value="full_archive">Full Archive</option>
+          <option value="files_only">Files Only</option>
+          <option value="text_only">Text Content Only</option>
+          <option value="linked_only">Linked Files Only</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="card">
+      <h3>Content Types</h3>
+      <div class="grid">
+        <label><input type="checkbox" id="ct-files-folders" /> Files & folders</label>
+        <label><input type="checkbox" id="ct-pages" /> Pages</label>
+        <label><input type="checkbox" id="ct-assignments" /> Assignments</label>
+        <label><input type="checkbox" id="ct-discussions" /> Discussions</label>
+        <label><input type="checkbox" id="ct-announcements" /> Announcements</label>
+        <label><input type="checkbox" id="ct-modules" /> Modules</label>
+        <label><input type="checkbox" id="ct-syllabus" /> Syllabus</label>
+        <label><input type="checkbox" id="ct-grades" /> Grades (CSV export)</label>
+        <label><input type="checkbox" id="ct-linked" /> Linked / extracted files</label>
+        <label><input type="checkbox" id="ct-text" /> Text snapshots (.html)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Download Behavior</h3>
+      <div class="grid">
+        <label>
+          File conflict handling
+          <select id="conflict-handling">
+            <option value="uniquify">Rename (add number suffix)</option>
+            <option value="overwrite">Overwrite existing file</option>
+            <option value="prompt">Prompt</option>
+          </select>
+        </label>
+        <label>
+          Delay between downloads (ms)
+          <input id="delay-ms" type="number" min="0" step="50" />
+        </label>
+        <label>
+          Custom folder prefix
+          <input id="folder-prefix" type="text" placeholder="e.g. Blackboard Downloads/" />
+        </label>
+        <label>
+          Max pages per course crawl
+          <input id="max-pages" type="number" min="1" step="1" />
+        </label>
+      </div>
+
+      <label><input type="checkbox" id="zip-bundling" /> ZIP bundling (one .zip per course)</label>
+      <label><input type="checkbox" id="incremental-mode" /> Incremental mode (skip unchanged files)</label>
+    </div>
+
+    <div class="card">
+      <h3>File Filters</h3>
+      <div class="grid">
+        <label><input type="checkbox" id="exclude-video" /> Exclude video files</label>
+        <label>
+          Maximum file size (MB)
+          <input id="max-file-size" type="number" min="0" step="1" />
+        </label>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="save">Save settings</button>
+      <button id="reset" class="secondary">Reset defaults</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

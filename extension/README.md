@@ -1,29 +1,47 @@
-# BlackboardSync Browser Extension (MVP)
+# BlackboardSync Browser Extension
 
-This extension is an initial browser-based downloader for Blackboard pages,
-inspired by projects like Canvas course downloaders.
+A browser-based course archiver for Blackboard, inspired by Canvas-style download workflows.
 
-## Scope (MVP)
+## Features (Current)
 
-- Detect downloadable links from the current Blackboard page.
-- Download all detected links to a folder named after the current course.
-- Keep the desktop app as the primary full-sync option.
+- Select one or multiple courses discovered from your Blackboard dashboard/page.
+- Active/past filtering with search in the course selector.
+- Export presets:
+  - Full Archive
+  - Files Only
+  - Text Content Only
+  - Linked Files Only
+  - Custom
+- Settings page with:
+  - Content type toggles
+  - Conflict handling
+  - Delay/throttling
+  - Folder prefix
+  - ZIP bundling (one ZIP per course)
+  - Incremental mode
+  - File filters (exclude video, max file size)
+- Keyboard shortcut:
+  - Windows/Linux: `Ctrl+Shift+D`
+  - macOS: `Cmd+Shift+D`
+- Works with Blackboard sessions already logged in on the browser.
 
-## Build/Package
+## Notes
 
-No build step is required for the MVP.
+- The extension crawls course pages reachable from the selected course URL and attempts to extract linked/downloadable resources.
+- ZIP bundling uses local browser-side ZIP generation (no server upload).
+- All settings and incremental history are stored locally via `chrome.storage.local`.
 
-To load locally in Chrome/Edge:
+## Install (Chrome / Edge)
 
-1. Open `chrome://extensions` or `edge://extensions`
-2. Enable `Developer mode`
-3. Click `Load unpacked`
-4. Select the `extension/` folder
+1. Open `chrome://extensions` (or `edge://extensions`).
+2. Enable `Developer mode`.
+3. Click `Load unpacked`.
+4. Select the `extension/` folder.
 
 ## Release
 
-Use a tag with prefix `ext-v` (example: `ext-v0.1.0`).
-The GitHub workflow `.github/workflows/release-extension.yml` will:
+Desktop tag (`0.x.y`) can attach extension assets through:
+- `.github/workflows/release-extension-assets.yml`
 
-- package the `extension/` folder as a `.zip`
-- create a GitHub Release with that asset
+Extension-only tag (`ext-vx.y.z`) uses:
+- `.github/workflows/release-extension.yml`

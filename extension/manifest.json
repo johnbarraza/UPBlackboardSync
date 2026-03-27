@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BlackboardSync Extension",
-  "description": "Download Blackboard course resources from the current page.",
-  "version": "0.1.0",
+  "description": "Archive Blackboard courses with presets, incremental mode, and optional ZIP bundling.",
+  "version": "0.2.0",
   "browser_specific_settings": {
     "gecko": {
       "id": "blackboardsync@up.edu.pe"
@@ -12,17 +12,28 @@
     "default_title": "BlackboardSync",
     "default_popup": "popup.html"
   },
+  "options_page": "options.html",
   "permissions": [
     "activeTab",
     "downloads",
     "storage",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "https://*/*"
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "commands": {
+    "quick-download-current": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D",
+        "mac": "Command+Shift+D"
+      },
+      "description": "Download resources from current course/page"
+    }
   },
   "content_scripts": [
     {
