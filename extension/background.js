@@ -305,6 +305,32 @@ function ensureFileName(base, url, contentType) {
   return `${cleaned}.bin`;
 }
 
+function removeExtension(filename) {
+  return String(filename || "").replace(/\.[A-Za-z0-9]{1,10}$/, "");
+}
+
+function looksLikeHtml(bytes) {
+  try {
+    const head = new TextDecoder("utf-8")
+      .decode(bytes.subarray(0, 512))
+      .toLowerCase();
+    return head.includes("<html") || head.includes("<!doctype html");
+  } catch (_err) {
+    return false;
+  }
+}
+
+function normalizeDownloadedFilename(filename, meta, bytes) {
+  const lower = String(filename || "").toLowerCase();
+  const isHtmlType = (meta.contentType || "").toLowerCase().includes("text/html");
+  if (isHtmlType && looksLikeHtml(bytes)) {
+    if (!lower.endsWith(".html") && !lower.endsWith(".htm")) {
+      return `${removeExtension(filename)}.html`;
+    }
+  }
+  return filename;
+}
+
 function isVideoResource(url, contentType) {
   return VIDEO_EXT_RE.test(url || "") || (contentType || "").toLowerCase().includes("video");
 }
@@ -447,7 +473,11 @@ async function processCourse(tabId, course, settings, historyRoot) {
           continue;
         }
 
-        const filename = ensureFileName(resource.title, resource.url, fetched.meta.contentType);
+        const filename = normalizeDownloadedFilename(
+          ensureFileName(resource.title, resource.url, fetched.meta.contentType),
+          fetched.meta,
+          fetched.bytes
+        );
         const folder = sanitizeName(resource.folder || "files");
         const zipPath = `${courseFolder}/${folder}/${filename}`;
         filesForZip.push({ name: zipPath, bytes: fetched.bytes });
@@ -481,37 +511,33 @@ async function processCourse(tabId, course, settings, historyRoot) {
 
     for (const resource of resources) {
       try {
-        let meta = {
-          contentType: "",
-          contentLength: 0,
-          lastModified: ""
-        };
-
-        if (settings.incrementalMode || settings.excludeVideo || settings.maxFileSizeMb > 0) {
-          const fetched = await fetchResource(resource.url);
-          meta = fetched.meta;
-          const verdict = applyResourceFilters(resource.url, meta, settings);
-          if (!verdict.keep) {
-            skipped.push({ url: resource.url, reason: verdict.reason });
-            continue;
-          }
-
-          const signature = makeSignature(resource.url, meta);
-          if (settings.incrementalMode && courseRoot[signature]) {
-            skipped.push({ url: resource.url, reason: "incremental" });
-            continue;
-          }
-          courseRoot[signature] = true;
+        const fetched = await fetchResource(resource.url);
+        const meta = fetched.meta;
+        const verdict = applyResourceFilters(resource.url, meta, settings);
+        if (!verdict.keep) {
+          skipped.push({ url: resource.url, reason: verdict.reason });
+          continue;
         }
 
-        const filename = ensureFileName(resource.title, resource.url, meta.contentType || "");
+        const signature = makeSignature(resource.url, meta);
+        if (settings.incrementalMode && courseRoot[signature]) {
+          skipped.push({ url: resource.url, reason: "incremental" });
+          continue;
+        }
+        courseRoot[signature] = true;
+
+        const filename = normalizeDownloadedFilename(
+          ensureFileName(resource.title, resource.url, meta.contentType || ""),
+          meta,
+          fetched.bytes
+        );
         const folder = sanitizeName(resource.folder || "files");
-        await chrome.downloads.download({
-          url: resource.url,
-          filename: `${courseFolder}/${folder}/${filename}`,
-          conflictAction: settings.conflictHandling,
-          saveAs: false
-        });
+        await downloadDataFile(
+          `${courseFolder}/${folder}/${filename}`,
+          meta.contentType || "application/octet-stream",
+          fetched.bytes,
+          settings.conflictHandling
+        );
         downloaded.push(resource.url);
         if (settings.delayMs > 0) {
           await sleep(settings.delayMs);

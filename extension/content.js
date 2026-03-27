@@ -17,6 +17,21 @@
     }
   }
 
+  function normalizeResourceUrl(rawUrl, baseUrl) {
+    try {
+      const u = new URL(rawUrl, baseUrl || location.href);
+      const path = u.pathname.toLowerCase();
+      if (path.includes("/bbcswebdav/")) {
+        u.searchParams.set("xythos-download", "true");
+        u.searchParams.delete("render");
+        u.searchParams.delete("isInlineRender");
+      }
+      return u.toString();
+    } catch (_err) {
+      return "";
+    }
+  }
+
   function parseCourseId(url) {
     if (!url) {
       return "";
@@ -324,7 +339,7 @@
       }
     }
 
-    return toAbsolute(raw, pageUrl);
+    return normalizeResourceUrl(raw, pageUrl);
   }
 
   function extractResourceLabel(node, absoluteUrl) {
@@ -378,7 +393,7 @@
 
       const label = extractResourceLabel(node, absolute);
 
-      if (isLikelyDownloadable(absolute) || /^https?:\/\//i.test(absolute)) {
+      if (isLikelyDownloadable(absolute)) {
         const key = `${absolute}::${label}`;
         if (!seenResources.has(key)) {
           resources.push({
@@ -478,7 +493,7 @@
       if (!absolute || seen.has(absolute)) {
         continue;
       }
-      if (!isLikelyDownloadable(absolute) && !/^https?:\/\//i.test(absolute)) {
+      if (!isLikelyDownloadable(absolute)) {
         continue;
       }
       seen.add(absolute);
