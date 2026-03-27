@@ -36,6 +36,11 @@
     if (!url) {
       return "";
     }
+    const raw = String(url).trim();
+    const fromCourseIdAttr = raw.match(/course-id-(_\d+_1)/i);
+    if (fromCourseIdAttr && fromCourseIdAttr[1]) {
+      return fromCourseIdAttr[1];
+    }
     const ultra = url.match(/\/courses\/([^/?#]+)/i);
     if (ultra && ultra[1]) {
       return decodeURIComponent(ultra[1]);
@@ -47,10 +52,6 @@
     const queryAlt = url.match(/[?&]courseId=([^&#]+)/i);
     if (queryAlt && queryAlt[1]) {
       return decodeURIComponent(queryAlt[1]);
-    }
-    const idPattern = String(url).match(/(_\d+_1)/);
-    if (idPattern && idPattern[1]) {
-      return idPattern[1];
     }
     return "";
   }
@@ -182,7 +183,16 @@
   }
 
   function cleanCourseName(raw) {
-    let value = sanitizeName(String(raw || "").replace(/\s+/g, " "));
+    let value = String(raw || "").replace(/\s+/g, " ").trim();
+    const nameCodeTerm = value.match(/^(.+?)\s*-\s*\d{4,}\s*-\s*[A-Za-z0-9]+\s*(?:\(|$)/);
+    if (nameCodeTerm && nameCodeTerm[1]) {
+      value = nameCodeTerm[1].trim();
+    }
+    const sectionName = value.match(/^(.+?)\s*-\s*SECCION\b/i);
+    if (sectionName && sectionName[1]) {
+      value = sectionName[1].trim();
+    }
+    value = sanitizeName(value);
     value = value.replace(/^Skip to course information\s*/i, "").trim();
     value = value.replace(/^Skip to main content\s*/i, "").trim();
     value = value.replace(/\s*\|\s*(active|past)\s*$/i, "").trim();
@@ -204,6 +214,9 @@
     if (/^_\d+_1$/i.test(value)) {
       return "";
     }
+    if (/^(item|course|untitled|archivo|file)$/i.test(value)) {
+      return "";
+    }
     return value;
   }
 
@@ -221,7 +234,22 @@
     if (/^_\d+_1$/i.test(n)) {
       return true;
     }
+    if (/^(item|course|untitled|archivo|file)$/i.test(n)) {
+      return true;
+    }
+    if (n.length < 3) {
+      return true;
+    }
     return false;
+  }
+
+  function hasStrongCourseSignal(text) {
+    const value = normalizeText(text).toUpperCase();
+    return (
+      /\b\d{4,}\s*-\s*[A-Za-z0-9]+\s*\((?:19|20)\d{2}/.test(value) ||
+      /\((?:19|20)\d{2}\s*[-_/ ]/.test(value) ||
+      /-\s*SECCION\b/.test(value)
+    );
   }
 
   function inferTermFromNode(node, courseName) {
@@ -297,7 +325,36 @@
   }
 
   function getCurrentCourseTitle(courseId) {
+    const courseIdNode = document.getElementById(`course-id-${courseId}`);
+    if (courseIdNode && courseIdNode.textContent) {
+      const displayIdName = cleanCourseName(courseIdNode.textContent);
+      if (!isWeakCourseName(displayIdName, courseId)) {
+        return displayIdName;
+      }
+    }
+
+    const courseHeader = document.querySelector("div[class*='courseTitle']");
+    if (courseHeader) {
+      const spanCandidates = Array.from(courseHeader.querySelectorAll("span"));
+      for (const span of spanCandidates) {
+        const cls = span.getAttribute("class") || "";
+        if (/courseId/i.test(cls)) {
+          continue;
+        }
+        const name = cleanCourseName(span.textContent || "");
+        if (name && !isWeakCourseName(name, courseId)) {
+          return name;
+        }
+      }
+      const headerText = cleanCourseName(courseHeader.textContent || "");
+      if (headerText && !isWeakCourseName(headerText, courseId)) {
+        return headerText;
+      }
+    }
+
     const selectors = [
+      "h1[class*='courseTitle']",
+      "div[class*='courseTitle']",
       "[data-qa='course-title']",
       "[data-testid*='course-title']",
       "main h1",
@@ -313,13 +370,13 @@
         continue;
       }
       const name = cleanCourseName(node.textContent);
-      if (name && name !== courseId) {
+      if (name && !isWeakCourseName(name, courseId)) {
         return name;
       }
     }
 
     const title = cleanCourseName(document.title);
-    if (title && title !== courseId) {
+    if (title && !isWeakCourseName(title, courseId)) {
       return title;
     }
 
@@ -379,6 +436,25 @@
   }
 
   function discoverCoursesFromDom() {
+    const currentId = parseCourseId(location.href);
+    if (currentId) {
+      const currentName = getCurrentCourseTitle(currentId);
+      const currentTerm = parseTermFromText(
+        `${currentName} ${(document.body && document.body.textContent) || ""}`
+      );
+      const currentStatusInfo = inferStatus(currentTerm, currentName);
+      const currentCourse = {
+        id: currentId,
+        name: currentName,
+        url: location.href,
+        term: currentTerm,
+        status: currentStatusInfo.status,
+        statusSource: currentStatusInfo.source,
+        nameStrength: true
+      };
+      return reconcileCourseStatuses([currentCourse]);
+    }
+
     const found = new Map();
     const candidates = [
       ...Array.from(document.querySelectorAll("a[href]")),
@@ -423,6 +499,8 @@
       const name = inferCourseNameFromNode(node, fallbackUrl);
       const term = inferTermFromNode(node, name);
       const statusInfo = inferStatus(term, name);
+      const signalText = `${node.textContent || ""} ${node.getAttribute("aria-label") || ""}`;
+      const nameStrength = hasStrongCourseSignal(signalText) || hasStrongCourseSignal(name);
 
       if (!found.has(courseId)) {
         found.set(courseId, {
@@ -431,7 +509,8 @@
           url: fallbackUrl,
           term,
           status: statusInfo.status,
-          statusSource: statusInfo.source
+          statusSource: statusInfo.source,
+          nameStrength
         });
         continue;
       }
@@ -440,7 +519,11 @@
       if (current && isWeakCourseName(current.name, courseId)) {
         if (!isWeakCourseName(name, courseId)) {
           current.name = name;
+          current.nameStrength = nameStrength;
         }
+      } else if (current && !current.nameStrength && nameStrength && !isWeakCourseName(name, courseId)) {
+        current.name = name;
+        current.nameStrength = true;
       }
       if (current && (current.term === "No term")) {
         const betterTerm = inferTermFromNode(node, name);
@@ -459,21 +542,6 @@
       if (current && (!current.url || current.url === location.href)) {
         current.url = fallbackUrl;
       }
-    }
-
-    const currentId = parseCourseId(location.href);
-    if (currentId && !found.has(currentId)) {
-      const currentName = getCurrentCourseTitle(currentId);
-      const currentTerm = parseTermFromText(currentName);
-      const currentStatusInfo = inferStatus(currentTerm, currentName);
-      found.set(currentId, {
-        id: currentId,
-        name: currentName,
-        url: location.href,
-        term: currentTerm,
-        status: currentStatusInfo.status,
-        statusSource: currentStatusInfo.source
-      });
     }
 
     return reconcileCourseStatuses(Array.from(found.values()));
