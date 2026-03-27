@@ -181,7 +181,9 @@ class UIManager(QObject):
 
         drive_creds = None
         if self.config_window.drive_credentials_path:
-            drive_creds = windows_safe_path(self.config_window.drive_credentials_path)
+            drive_creds = windows_safe_path(
+                self.config_window.drive_credentials_path
+            )
 
         self.signals.config.emit(sync_dir, self.config_window.sync_frequency,
                                  self.config_window.backup_enabled, backup_dir,
@@ -192,12 +194,14 @@ class UIManager(QObject):
     def slot_quit(self) -> None:
         self.login_window.shutdown()
         self.app.quit()
-        
+
     @pyqtSlot()
     def slot_auth_drive(self) -> None:
         creds = None
         if self.config_window.drive_credentials_path:
-            creds = windows_safe_path(self.config_window.drive_credentials_path)
+            creds = windows_safe_path(
+                self.config_window.drive_credentials_path
+            )
         self.signals.auth_drive.emit(creds)
 
     def open_settings(self, download_location: Path, username: str,
@@ -217,7 +221,11 @@ class UIManager(QObject):
         self.config_window.drive_enabled = drive_enabled
         self.config_window.drive_credentials_path = drive_creds
         self.config_window.set_drive_status(drive_email)
-        self.config_window.set_courses(courses, selected_course_ids, course_sync_status)
+        self.config_window.set_courses(
+            courses,
+            selected_course_ids,
+            course_sync_status
+        )
         self.show(self.config_window)
 
     def ask_course_selection(self,

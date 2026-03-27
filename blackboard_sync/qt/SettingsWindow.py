@@ -53,7 +53,7 @@ class SettingsWindow(QWidget):
         self.log_out_button: QPushButton
         self.setup_button: QPushButton
         self.button_box: QDialogButtonBox
-        
+
         # Backup widgets
         self.select_backup_location: QPushButton
         self.enable_backup: QCheckBox
@@ -83,7 +83,9 @@ class SettingsWindow(QWidget):
 
         # Slots
         self.select_download_location.clicked.connect(self._choose_location)
-        self.select_backup_location.clicked.connect(self._choose_backup_location)
+        self.select_backup_location.clicked.connect(
+            self._choose_backup_location
+        )
         self.enable_backup.toggled.connect(self._toggle_backup)
         self.select_credentials.clicked.connect(self._choose_credentials)
         self.drive_auth_button.clicked.connect(self.signals.auth_drive)
@@ -241,7 +243,9 @@ class SettingsWindow(QWidget):
 
     @selected_course_ids.setter
     def selected_course_ids(self, value: list[str]) -> None:
-        self._selected_course_ids = [course_id for course_id in value if course_id]
+        self._selected_course_ids = [
+            course_id for course_id in value if course_id
+        ]
         self._update_course_selection_hint()
 
     def set_courses(self,
@@ -250,22 +254,30 @@ class SettingsWindow(QWidget):
                     course_sync_status: dict[str, datetime]) -> None:
         self._available_courses = courses
         self._course_sync_status = course_sync_status
-        self._selected_course_ids = [course_id for course_id in selected_course_ids if course_id]
+        self._selected_course_ids = [
+            course_id for course_id in selected_course_ids if course_id
+        ]
         self.select_courses_button.setEnabled(bool(self._available_courses))
         self._update_course_selection_hint()
 
     def _update_course_selection_hint(self) -> None:
         total = len(self._available_courses)
-        available_ids = {course.get('id') for course in self._available_courses}
+        available_ids = {
+            course.get('id') for course in self._available_courses
+        }
         selected = (
             len(available_ids.intersection(self._selected_course_ids))
             if self._selected_course_ids else total
         )
         if total <= 0:
-            self.selected_courses_hint.setText(self.tr("No courses loaded yet"))
+            self.selected_courses_hint.setText(
+                self.tr("No courses loaded yet")
+            )
             return
 
         if selected >= total:
             self.selected_courses_hint.setText(f"All courses ({total})")
         else:
-            self.selected_courses_hint.setText(f"Selected courses: {selected}/{total}")
+            self.selected_courses_hint.setText(
+                f"Selected courses: {selected}/{total}"
+            )
