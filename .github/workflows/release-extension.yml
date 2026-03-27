@@ -52,12 +52,13 @@ jobs:
           print(f"manifest version set to {version}")
           PY
 
-      - name: Pack extension zip
+      - name: Package Chrome zip and Firefox xpi
         run: |
           TAG="${{ steps.vars.outputs.tag }}"
           VERSION="${TAG#ext-v}"
           cd extension
-          zip -r "../blackboardsync-extension-${VERSION}.zip" .
+          zip -r "../blackboardsync-extension-chrome-${VERSION}.zip" .
+          zip -r "../blackboardsync-extension-firefox-${VERSION}.xpi" .
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -65,4 +66,6 @@ jobs:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: BlackboardSync Extension ${{ steps.vars.outputs.tag }}
           generate_release_notes: true
-          files: blackboardsync-extension-*.zip
+          files: |
+            blackboardsync-extension-chrome-*.zip
+            blackboardsync-extension-firefox-*.xpi
