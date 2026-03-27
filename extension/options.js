@@ -50,6 +50,8 @@ const PRESETS = {
 };
 
 const DEFAULT_SETTINGS = {
+  universityLabel: "",
+  preferredHost: "",
   exportPreset: "full_archive",
   contentTypes: { ...PRESETS.full_archive },
   conflictHandling: "uniquify",
@@ -69,6 +71,11 @@ function setStatus(msg) {
 function readForm() {
   const exportPreset = document.getElementById("export-preset").value;
   return {
+    universityLabel: (document.getElementById("university-label").value || "").trim(),
+    preferredHost: (document.getElementById("preferred-host").value || "")
+      .replace(/^https?:\/\//i, "")
+      .replace(/\/+$/, "")
+      .trim(),
     exportPreset,
     contentTypes: {
       filesFolders: document.getElementById("ct-files-folders").checked,
@@ -94,6 +101,8 @@ function readForm() {
 }
 
 function fillForm(settings) {
+  document.getElementById("university-label").value = settings.universityLabel || "";
+  document.getElementById("preferred-host").value = settings.preferredHost || "";
   document.getElementById("export-preset").value = settings.exportPreset || "custom";
   document.getElementById("ct-files-folders").checked = !!settings.contentTypes.filesFolders;
   document.getElementById("ct-pages").checked = !!settings.contentTypes.pages;

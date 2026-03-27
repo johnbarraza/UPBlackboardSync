@@ -29,6 +29,14 @@
     if (query && query[1]) {
       return decodeURIComponent(query[1]);
     }
+    const queryAlt = url.match(/[?&]courseId=([^&#]+)/i);
+    if (queryAlt && queryAlt[1]) {
+      return decodeURIComponent(queryAlt[1]);
+    }
+    const idPattern = String(url).match(/(_\d+_1)/);
+    if (idPattern && idPattern[1]) {
+      return idPattern[1];
+    }
     return "";
   }
 
@@ -53,32 +61,107 @@
     return "active";
   }
 
+  function cleanCourseName(raw) {
+    let value = sanitizeName(String(raw || "").replace(/\s+/g, " "));
+    value = value.replace(/^Skip to main content\s*/i, "").trim();
+    value = value.replace(/\s*\|\s*(active|past)\s*$/i, "").trim();
+    if (/^_\d+_1$/i.test(value)) {
+      return "";
+    }
+    return value;
+  }
+
   function inferCourseNameFromNode(node, url) {
+    const titleNode =
+      node.querySelector("[data-qa='course-title']") ||
+      node.querySelector("[data-testid*='course-title']") ||
+      node.querySelector("h1,h2,h3,h4");
+
     const title =
+      node.getAttribute("data-course-title") ||
       node.getAttribute("title") ||
       node.getAttribute("aria-label") ||
+      (titleNode && titleNode.textContent) ||
       node.textContent ||
       document.title ||
       parseCourseId(url);
-    return sanitizeName(title.replace(/\s+/g, " "));
+
+    return cleanCourseName(title) || parseCourseId(url);
+  }
+
+  function getCurrentCourseTitle(courseId) {
+    const selectors = [
+      "[data-qa='course-title']",
+      "[data-testid*='course-title']",
+      "main h1",
+      "header h1",
+      "h1",
+      ".course-title",
+      "[class*='courseTitle']"
+    ];
+
+    for (const sel of selectors) {
+      const node = document.querySelector(sel);
+      if (!node || !node.textContent) {
+        continue;
+      }
+      const name = cleanCourseName(node.textContent);
+      if (name && name !== courseId) {
+        return name;
+      }
+    }
+
+    const title = cleanCourseName(document.title);
+    if (title && title !== courseId) {
+      return title;
+    }
+
+    return courseId;
   }
 
   function discoverCoursesFromDom() {
     const found = new Map();
-    const candidates = Array.from(document.querySelectorAll("a[href]"));
+    const candidates = [
+      ...Array.from(document.querySelectorAll("a[href]")),
+      ...Array.from(
+        document.querySelectorAll(
+          "[data-course-id],[data-courseid],[course-id]"
+        )
+      )
+    ];
 
-    for (const a of candidates) {
-      const href = a.getAttribute("href");
+    for (const node of candidates) {
+      const href =
+        node.getAttribute("href") ||
+        (node.closest("a[href]") && node.closest("a[href]").getAttribute("href"));
       const url = toAbsolute(href, location.href);
-      if (!url || !/^https?:\/\//i.test(url)) {
-        continue;
+
+      let courseId = parseCourseId(url);
+      if (!courseId) {
+        const attrs = [
+          node.getAttribute("data-course-id"),
+          node.getAttribute("data-courseid"),
+          node.getAttribute("course-id"),
+          node.getAttribute("id"),
+          node.getAttribute("aria-controls"),
+          node.getAttribute("aria-label")
+        ];
+        for (const value of attrs) {
+          const id = parseCourseId(value || "");
+          if (id) {
+            courseId = id;
+            break;
+          }
+        }
       }
-      const courseId = parseCourseId(url);
+
       if (!courseId) {
         continue;
       }
 
-      const name = inferCourseNameFromNode(a, url);
+      const fallbackUrl =
+        url || `${location.origin}/ultra/courses/${encodeURIComponent(courseId)}/outline`;
+      const name = inferCourseNameFromNode(node, fallbackUrl);
       const term = parseTermFromText(name);
       const status = inferStatus(term, name);
 
@@ -86,16 +169,25 @@
         found.set(courseId, {
           id: courseId,
           name,
-          url,
+          url: fallbackUrl,
           term,
           status
         });
+        continue;
+      }
+
+      const current = found.get(courseId);
+      if (current && current.name === courseId && name !== courseId) {
+        current.name = name;
+      }
+      if (current && (!current.url || current.url === location.href)) {
+        current.url = fallbackUrl;
       }
     }
 
     const currentId = parseCourseId(location.href);
     if (currentId && !found.has(currentId)) {
-      const currentName = sanitizeName(document.title || currentId);
+      const currentName = getCurrentCourseTitle(currentId);
       found.set(currentId, {
         id: currentId,
         name: currentName,
@@ -208,6 +300,105 @@
     return response.text();
   }
 
+  function collectLinksFromPage(doc) {
+    return [
+      ...Array.from(doc.querySelectorAll("a[href]")),
+      ...Array.from(doc.querySelectorAll("iframe[src]")),
+      ...Array.from(doc.querySelectorAll("img[src]")),
+      ...Array.from(doc.querySelectorAll("source[src]")),
+      ...Array.from(doc.querySelectorAll("[aria-controls^='file-preview-']"))
+    ];
+  }
+
+  function extractResourceUrl(node, pageUrl) {
+    let raw =
+      node.getAttribute("href") ||
+      node.getAttribute("src") ||
+      node.getAttribute("data-href") ||
+      node.getAttribute("data-resource-url");
+
+    if (!raw) {
+      const controls = node.getAttribute("aria-controls") || "";
+      if (controls.startsWith("file-preview-")) {
+        raw = controls.slice("file-preview-".length);
+      }
+    }
+
+    return toAbsolute(raw, pageUrl);
+  }
+
+  function extractResourceLabel(node, absoluteUrl) {
+    const aria = node.getAttribute("aria-label") || "";
+    const ariaMatch = aria.match(/(?:File|Archivo)\s+(.+)$/i);
+    const label = sanitizeName(
+      node.getAttribute("title") ||
+      (ariaMatch && ariaMatch[1]) ||
+      aria ||
+      node.textContent ||
+      filenameFromUrl(absoluteUrl)
+    );
+    return label || filenameFromUrl(absoluteUrl);
+  }
+
+  function parsePageContent(
+    doc,
+    pageUrl,
+    html,
+    course,
+    settings,
+    queue,
+    seenPages,
+    seenResources,
+    resources,
+    textFiles,
+    gradeRows
+  ) {
+    const pageTitle = sanitizeName(
+      (doc.querySelector("title") && doc.querySelector("title").textContent) ||
+      pageUrl
+    );
+    const pageType = classifyPage(pageUrl);
+
+    if (settings.contentTypes.text && settings.contentTypes[pageType] !== false) {
+      textFiles.push({
+        path: `${pageType}/${pageTitle}.html`,
+        body: html
+      });
+    }
+
+    if (settings.contentTypes.gradesCsv) {
+      gradeRows.push(...collectGradeRows(doc));
+    }
+
+    for (const node of collectLinksFromPage(doc)) {
+      const absolute = extractResourceUrl(node, pageUrl);
+      if (!absolute) {
+        continue;
+      }
+
+      const label = extractResourceLabel(node, absolute);
+
+      if (isLikelyDownloadable(absolute) || /^https?:\/\//i.test(absolute)) {
+        const key = `${absolute}::${label}`;
+        if (!seenResources.has(key)) {
+          resources.push({
+            url: absolute,
+            title: label,
+            folder: pageType,
+            sourcePage: pageUrl
+          });
+          seenResources.add(key);
+        }
+      }
+
+      if (shouldFollowLink(absolute, course.id)) {
+        if (!seenPages.has(absolute) && !queue.includes(absolute)) {
+          queue.push(absolute);
+        }
+      }
+    }
+  }
+
   async function crawlCourse(course, settings) {
     const maxPages = Number(settings.maxPagesPerCourse || 60);
     const queue = [toAbsolute(course.url, location.href)];
@@ -216,6 +407,28 @@
     const resources = [];
     const textFiles = [];
     const gradeRows = [];
+
+    const currentCourseId = parseCourseId(location.href);
+    if (currentCourseId && currentCourseId === course.id) {
+      const liveHtml = document.documentElement
+        ? document.documentElement.outerHTML
+        : document.body.innerHTML;
+      const liveUrl = toAbsolute(location.href, location.href);
+      seenPages.add(liveUrl);
+      parsePageContent(
+        document,
+        liveUrl,
+        liveHtml,
+        course,
+        settings,
+        queue,
+        seenPages,
+        seenResources,
+        resources,
+        textFiles,
+        gradeRows
+      );
+    }
 
     while (queue.length > 0 && seenPages.size < maxPages) {
       const pageUrl = queue.shift();
@@ -232,65 +445,19 @@
       }
 
       const doc = new DOMParser().parseFromString(html, "text/html");
-      const pageTitle = sanitizeName(
-        (doc.querySelector("title") && doc.querySelector("title").textContent) ||
-        pageUrl
+      parsePageContent(
+        doc,
+        pageUrl,
+        html,
+        course,
+        settings,
+        queue,
+        seenPages,
+        seenResources,
+        resources,
+        textFiles,
+        gradeRows
       );
-      const pageType = classifyPage(pageUrl);
-
-      if (settings.contentTypes.text && settings.contentTypes[pageType] !== false) {
-        textFiles.push({
-          path: `${pageType}/${pageTitle}.html`,
-          body: html
-        });
-      }
-
-      if (settings.contentTypes.gradesCsv) {
-        gradeRows.push(...collectGradeRows(doc));
-      }
-
-      const linkNodes = [
-        ...Array.from(doc.querySelectorAll("a[href]")),
-        ...Array.from(doc.querySelectorAll("iframe[src]")),
-        ...Array.from(doc.querySelectorAll("img[src]")),
-        ...Array.from(doc.querySelectorAll("source[src]"))
-      ];
-
-      for (const node of linkNodes) {
-        const raw =
-          node.getAttribute("href") ||
-          node.getAttribute("src");
-        const absolute = toAbsolute(raw, pageUrl);
-        if (!absolute) {
-          continue;
-        }
-
-        const label = sanitizeName(
-          node.getAttribute("title") ||
-          node.getAttribute("aria-label") ||
-          node.textContent ||
-          filenameFromUrl(absolute)
-        );
-
-        if (isLikelyDownloadable(absolute) || /^https?:\/\//i.test(absolute)) {
-          const key = `${absolute}::${label}`;
-          if (!seenResources.has(key)) {
-            resources.push({
-              url: absolute,
-              title: label,
-              folder: pageType,
-              sourcePage: pageUrl
-            });
-            seenResources.add(key);
-          }
-        }
-
-        if (shouldFollowLink(absolute, course.id)) {
-          if (!seenPages.has(absolute) && !queue.includes(absolute)) {
-            queue.push(absolute);
-          }
-        }
-      }
     }
 
     return {

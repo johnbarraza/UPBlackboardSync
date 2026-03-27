@@ -13,6 +13,8 @@ function getSelectedCourseIds() {
 
 function summarizeSettings(s) {
   return [
+    `University: ${s.universityLabel || "n/a"}`,
+    `Host: ${s.preferredHost || "auto"}`,
     `Preset: ${s.exportPreset}`,
     `ZIP: ${s.zipBundling ? "on" : "off"}`,
     `Incremental: ${s.incrementalMode ? "on" : "off"}`,

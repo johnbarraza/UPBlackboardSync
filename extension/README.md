@@ -13,6 +13,7 @@ A browser-based course archiver for Blackboard, inspired by Canvas-style downloa
   - Linked Files Only
   - Custom
 - Settings page with:
+  - University label + preferred Blackboard host
   - Content type toggles
   - Conflict handling
   - Delay/throttling

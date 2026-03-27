@@ -58,6 +58,8 @@ const PRESETS = {
 };
 
 const DEFAULT_SETTINGS = {
+  universityLabel: "",
+  preferredHost: "",
   exportPreset: "full_archive",
   contentTypes: {
     filesFolders: true,
@@ -114,6 +116,11 @@ function mergeSettings(raw) {
   merged.maxFileSizeMb = Math.max(0, Number(merged.maxFileSizeMb || 0));
   merged.maxPagesPerCourse = Math.max(1, Number(merged.maxPagesPerCourse || 60));
   merged.folderPrefix = String(merged.folderPrefix || "").trim();
+  merged.universityLabel = String(merged.universityLabel || "").trim();
+  merged.preferredHost = String(merged.preferredHost || "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "")
+    .trim();
 
   return merged;
 }
@@ -382,9 +389,18 @@ async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
 }
 
 async function processCourse(tabId, course, settings, historyRoot) {
+  const fallbackUrl = settings.preferredHost
+    ? `https://${settings.preferredHost}/ultra/courses/${encodeURIComponent(course.id)}/outline`
+    : "";
+  const resolvedUrl = normalizeUrl(course.url) || fallbackUrl;
+  const resolvedCourse = {
+    ...course,
+    url: resolvedUrl || course.url
+  };
+
   const crawlResp = await sendToTab(tabId, {
     type: "crawl-course",
-    course,
+    course: resolvedCourse,
     settings
   });
 
@@ -399,7 +415,7 @@ async function processCourse(tabId, course, settings, historyRoot) {
   const downloaded = [];
   const skipped = [];
 
-  const host = new URL(course.url).host;
+  const host = resolvedUrl ? new URL(resolvedUrl).host : "unknown-host";
   const hostRoot = historyRoot[host] || {};
   const courseRoot = hostRoot[course.id] || {};
 
