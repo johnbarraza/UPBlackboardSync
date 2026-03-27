@@ -613,6 +613,41 @@
       FILE_EXT_RE.test(url);
   }
 
+  function addUrlToQueue(queue, seenPages, rawUrl) {
+    const normalized = normalizeUrl(rawUrl);
+    if (!normalized) {
+      return;
+    }
+    if (seenPages.has(normalized)) {
+      return;
+    }
+    if (queue.includes(normalized)) {
+      return;
+    }
+    queue.push(normalized);
+  }
+
+  function buildCourseSeedUrls(courseId, pageOrCourseUrl) {
+    if (!courseId) {
+      return [];
+    }
+
+    let origin = location.origin;
+    try {
+      const parsed = new URL(pageOrCourseUrl || location.href);
+      origin = parsed.origin;
+    } catch (_err) {
+      // keep default origin
+    }
+
+    const encoded = encodeURIComponent(courseId);
+    return [
+      `${origin}/ultra/courses/${encoded}/outline`,
+      `${origin}/ultra/courses/${encoded}/announcements`,
+      `${origin}/webapps/blackboard/execute/announcement?course_id=${encoded}`
+    ];
+  }
+
   function collectGradeRows(doc) {
     const rows = [];
     const tables = Array.from(doc.querySelectorAll("table"));
@@ -739,21 +774,36 @@
       }
 
       if (shouldFollowLink(absolute, course.id)) {
-        if (!seenPages.has(absolute) && !queue.includes(absolute)) {
-          queue.push(absolute);
-        }
+        addUrlToQueue(queue, seenPages, absolute);
+      }
+    }
+
+    const hasAnnouncementSignal =
+      pageType === "announcements" ||
+      !!doc.querySelector("span[data-title='Announcements']") ||
+      !!doc.querySelector("caption#announcement-table-caption") ||
+      !!doc.querySelector("table.table-content.sortable-table");
+
+    if (hasAnnouncementSignal) {
+      for (const seed of buildCourseSeedUrls(course.id, pageUrl)) {
+        addUrlToQueue(queue, seenPages, seed);
       }
     }
   }
 
   async function crawlCourse(course, settings) {
     const maxPages = Number(settings.maxPagesPerCourse || 60);
-    const queue = [toAbsolute(course.url, location.href)];
+    const queue = [];
     const seenPages = new Set();
     const seenResources = new Set();
     const resources = [];
     const textFiles = [];
     const gradeRows = [];
+
+    addUrlToQueue(queue, seenPages, toAbsolute(course.url, location.href));
+    for (const seed of buildCourseSeedUrls(course.id, course.url || location.href)) {
+      addUrlToQueue(queue, seenPages, seed);
+    }
 
     const currentCourseId = parseCourseId(location.href);
     if (currentCourseId && currentCourseId === course.id) {
@@ -775,6 +825,10 @@
         textFiles,
         gradeRows
       );
+
+      for (const seed of buildCourseSeedUrls(course.id, liveUrl)) {
+        addUrlToQueue(queue, seenPages, seed);
+      }
     }
 
     while (queue.length > 0 && seenPages.size < maxPages) {
