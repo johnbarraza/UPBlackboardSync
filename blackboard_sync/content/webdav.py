@@ -67,17 +67,24 @@ class ContentParser:
             if uri:
                 display = None
 
-                # Priority 1: Check aria-label for filename (Blackboard Ultra uses this)
+                # Priority 1: use aria-label for filename
+                # (Blackboard Ultra uses this).
                 aria_label = el.get('aria-label', '')
                 if aria_label:
-                    # Extract filename from patterns like "Preview File filename.pdf"
-                    match = re.search(r'(?:Preview File|Download|File)\s+(.+?)(?:\s*$)', aria_label)
+                    # Extract name from "Preview File filename.pdf"
+                    match = re.search(
+                        r'(?:Preview File|Download|File)\s+(.+?)(?:\s*$)',
+                        aria_label,
+                    )
                     if match:
                         candidate = match.group(1).strip()
-                        if candidate and not candidate.lower().startswith('xid'):
+                        if (
+                                candidate
+                                and not candidate.lower().startswith('xid')):
                             display = candidate
 
-                # Priority 2: use element title (e.g., iframe title in Ultra inline previews)
+                # Priority 2: use element title (for example iframe title in
+                # Ultra inline previews).
                 if not display:
                     title_attr = (el.get('title') or '').strip()
                     if title_attr and not title_attr.lower().startswith('xid'):
@@ -87,13 +94,18 @@ class ContentParser:
                 if not display:
                     aria_controls = el.get('aria-controls', '')
                     if 'xid-' in aria_controls:
-                        # Try to extract filename from URLs like file-preview-...xid-19839037_1
+                        # Try extracting from URL like:
+                        # file-preview-...xid-19839037_1
                         parsed = urlparse(uri)
                         last = unquote(os.path.basename(parsed.path))
                         if not last or last.lower().startswith('xid'):
                             # Try query params
                             qs = parse_qs(parsed.query)
-                            for key in ('filename', 'file', 'name', 'FileName'):
+                            for key in (
+                                    'filename',
+                                    'file',
+                                    'name',
+                                    'FileName'):
                                 if key in qs and qs[key]:
                                     display = qs[key][0]
                                     break
@@ -108,9 +120,17 @@ class ContentParser:
                 if not display:
                     parsed = urlparse(uri)
                     last = unquote(os.path.basename(parsed.path))
-                    if (not last) or ('=' in last) or last.lower().startswith('xid'):
+                    if (
+                            (not last)
+                            or ('=' in last)
+                            or last.lower().startswith('xid')):
                         qs = parse_qs(parsed.query)
-                        for key in ('filename', 'file', 'name', 'FileName', 'xid'):
+                        for key in (
+                                'filename',
+                                'file',
+                                'name',
+                                'FileName',
+                                'xid'):
                             if key in qs and qs[key]:
                                 last = qs[key][0]
                                 break
@@ -118,7 +138,8 @@ class ContentParser:
 
                 links.append(Link(href=uri, text=display))
 
-                # Replace href/src with a local filename when it's a same-site link
+                # Replace href/src with a local filename when this is
+                # a same-site link.
                 if uri.startswith(base_url):
                     el[attr] = display
         return links
@@ -174,9 +195,15 @@ class WebDavFile(BStream):
             # Use the parsed link text (from ContentParser) if it seems ok
             candidate = link.text or ''
             # If candidate looks like an encoded query param or xid, fall back
-            if not candidate or ('=' in candidate) or candidate.lower().startswith('xid'):
+            if (
+                    not candidate
+                    or ('=' in candidate)
+                    or candidate.lower().startswith('xid')):
                 parsed = urlparse(link.href)
-                candidate = unquote(os.path.basename(parsed.path)) or f"file-{uuid.uuid4()}"
+                candidate = (
+                    unquote(os.path.basename(parsed.path))
+                    or f"file-{uuid.uuid4()}"
+                )
 
             filename = candidate
 

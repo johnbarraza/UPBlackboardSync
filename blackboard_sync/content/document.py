@@ -24,12 +24,21 @@ class Document:
         except BBBadRequestError:
             # Some content items don't support file attachments (HTTP 400).
             # Treat them as having no attachments and continue gracefully.
-            course_id = api_path.get('course_id') if isinstance(api_path, dict) else None
-            content_id = api_path.get('content_id') if isinstance(api_path, dict) else None
+            course_id = (
+                api_path.get('course_id')
+                if isinstance(api_path, dict) else None
+            )
+            content_id = (
+                api_path.get('content_id')
+                if isinstance(api_path, dict) else None
+            )
             handler = getattr(content, 'contentHandler', None)
             title = getattr(content, 'title', None)
             logger.warning(
-                "Content item does not support file attachments: title=%s, handler=%s, course_id=%s, content_id=%s",
+                (
+                    "Content item does not support file attachments: "
+                    "title=%s, handler=%s, course_id=%s, content_id=%s"
+                ),
                 title, handler, course_id, content_id
             )
             attachments = []

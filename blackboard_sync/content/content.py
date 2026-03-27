@@ -51,11 +51,17 @@ class Content:
             chosen = None
             try:
                 if getattr(content, 'body', None):
-                    parser = ContentParser(content.body, job.session.instance_url)
+                    parser = ContentParser(
+                        content.body,
+                        job.session.instance_url,
+                    )
                     text = (parser.text or '').strip()
                     if text:
                         # use first non-empty line as title
-                        first_line = next((ln for ln in text.splitlines() if ln.strip()), None)
+                        first_line = next(
+                            (ln for ln in text.splitlines() if ln.strip()),
+                            None,
+                        )
                         chosen = first_line
                     # fallback to first link text
                     if not chosen and parser.links:

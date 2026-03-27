@@ -24,12 +24,19 @@ class BStream:
             try:
                 with path.open("wb") as f:
                     # Download with larger chunks and handle incomplete reads
-                    for chunk in stream.iter_content(chunk_size=self.CHUNK_SIZE, decode_unicode=False):
+                    for chunk in stream.iter_content(
+                            chunk_size=self.CHUNK_SIZE,
+                            decode_unicode=False):
                         if chunk:  # Filter out keep-alive chunks
                             f.write(chunk)
                 logger.info(f"Successfully downloaded: {path.name}")
             except Exception as e:
-                logger.error(f"Failed to download {path.name}: {type(e).__name__}: {e}")
+                logger.error(
+                    "Failed to download %s: %s: %s",
+                    path.name,
+                    type(e).__name__,
+                    e,
+                )
                 # Clean up partial file
                 if path.exists():
                     try:
