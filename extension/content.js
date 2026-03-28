@@ -9,6 +9,8 @@
     "whitespace in the label text",
     "for reference, the error id is"
   ];
+  const STATIC_ASSET_HOST_RE = /(^|\.)blackboardcdn\.com$/i;
+  const COURSE_CONTENT_ANALYTICS_RE = /content\.item\.course\.outline\.coursecontent\.link/i;
 
   function fixMojibake(input) {
     const raw = String(input || "");
@@ -720,13 +722,14 @@
   }
 
   function collectLinksFromPage(doc) {
+    const scope = doc.querySelector(".js-content-outline, .course-outline-content-list") || doc;
     return [
-      ...Array.from(doc.querySelectorAll("a[href]")),
-      ...Array.from(doc.querySelectorAll("button[data-analytics-id*='course.content.navigation.item.content-link']")),
-      ...Array.from(doc.querySelectorAll("iframe[src]")),
-      ...Array.from(doc.querySelectorAll("img[src]")),
-      ...Array.from(doc.querySelectorAll("source[src]")),
-      ...Array.from(doc.querySelectorAll("[aria-controls^='file-preview-']"))
+      ...Array.from(scope.querySelectorAll("a[href]")),
+      ...Array.from(scope.querySelectorAll("button[data-analytics-id*='course.content.navigation.item.content-link']")),
+      ...Array.from(scope.querySelectorAll("iframe[src]")),
+      ...Array.from(scope.querySelectorAll("img[src]")),
+      ...Array.from(scope.querySelectorAll("source[src]")),
+      ...Array.from(scope.querySelectorAll("[aria-controls^='file-preview-']"))
     ];
   }
 
@@ -790,6 +793,70 @@
       filenameFromUrl(absoluteUrl)
     );
     return label || filenameFromUrl(absoluteUrl);
+  }
+
+  function isStaticUiAssetUrl(url) {
+    try {
+      const parsed = new URL(url, location.href);
+      const host = parsed.hostname.toLowerCase();
+      const path = parsed.pathname.toLowerCase();
+      if (path.includes("default_profile_avatar.svg")) {
+        return true;
+      }
+      if (STATIC_ASSET_HOST_RE.test(host) && /\/images\//.test(path)) {
+        return true;
+      }
+      return false;
+    } catch (_err) {
+      return false;
+    }
+  }
+
+  function nodeHasCourseContentSignal(node) {
+    if (!node) {
+      return false;
+    }
+    const analytics = node.getAttribute("data-analytics-id") || "";
+    if (COURSE_CONTENT_ANALYTICS_RE.test(analytics)) {
+      return true;
+    }
+    if (node.closest("[data-content-id]")) {
+      return true;
+    }
+    if (node.closest(".js-content-outline, .course-outline-content-list")) {
+      return true;
+    }
+    return false;
+  }
+
+  function shouldIncludeDetectedResource(node, absoluteUrl, courseId) {
+    if (!absoluteUrl || isStaticUiAssetUrl(absoluteUrl)) {
+      return false;
+    }
+    if (nodeHasCourseContentSignal(node)) {
+      return true;
+    }
+
+    let parsed;
+    try {
+      parsed = new URL(absoluteUrl, location.href);
+    } catch (_err) {
+      return false;
+    }
+
+    const lower = absoluteUrl.toLowerCase();
+    const sameHost = parsed.host === location.host;
+    if (!sameHost) {
+      return /drive\.google\.com|docs\.google\.com|onedrive\.live\.com|dropbox\.com/i.test(parsed.host);
+    }
+
+    if (courseId && lower.includes(String(courseId).toLowerCase())) {
+      return true;
+    }
+    if (/bbcswebdav|xythos-download|\/outline\/file\/|\/outline\/edit\/document\//i.test(lower)) {
+      return true;
+    }
+    return false;
   }
 
   function addUniquePathSegment(segments, seen, value) {
@@ -902,6 +969,9 @@
         extractResourceUrl(node, pageUrl) ||
         inferUltraResourceUrlFromNode(node, pageUrl, course.id);
       if (!absolute) {
+        continue;
+      }
+      if (!shouldIncludeDetectedResource(node, absolute, course.id)) {
         continue;
       }
 
@@ -1028,6 +1098,9 @@
         toAbsolute(raw, location.href) ||
         inferUltraResourceUrlFromNode(node, location.href, parseCourseId(location.href));
       if (!absolute || seen.has(absolute)) {
+        continue;
+      }
+      if (!shouldIncludeDetectedResource(node, absolute, parseCourseId(location.href))) {
         continue;
       }
       if (!isLikelyDownloadable(absolute)) {
