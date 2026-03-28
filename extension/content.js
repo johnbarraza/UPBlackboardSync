@@ -1,5 +1,7 @@
 (function () {
   const FILE_EXT_RE = /\.(pdf|docx?|pptx?|xlsx?|zip|rar|txt|csv|rtf|odt|ods|odp|png|jpe?g|gif|svg|webp|mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i;
+  const BLACKBOARD_FILE_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/file\/[^/?#]+/i;
+  const BLACKBOARD_DOCUMENT_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/edit\/document\/[^/?#]+/i;
 
   function sanitizeName(input) {
     return String(input || "")
@@ -12,6 +14,14 @@
   function toAbsolute(url, baseUrl) {
     try {
       return new URL(url, baseUrl || location.href).toString();
+    } catch (_err) {
+      return "";
+    }
+  }
+
+  function normalizeUrl(url) {
+    try {
+      return new URL(url, location.href).toString();
     } catch (_err) {
       return "";
     }
@@ -610,6 +620,8 @@
       return false;
     }
     return /bbcswebdav|xythos-download|render=inline|download/i.test(url) ||
+      BLACKBOARD_FILE_ROUTE_RE.test(url) ||
+      BLACKBOARD_DOCUMENT_ROUTE_RE.test(url) ||
       FILE_EXT_RE.test(url);
   }
 

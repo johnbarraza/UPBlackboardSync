@@ -99,6 +99,9 @@ const DEFAULT_SETTINGS = {
 
 const VIDEO_EXT_RE = /\.(mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i;
 const FILE_EXT_RE = /\.[A-Za-z0-9]{2,8}$/;
+const BLACKBOARD_FILE_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/file\/[^/?#]+(?:\/download)?/i;
+const BLACKBOARD_DOCUMENT_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/edit\/document\/[^/?#]+(?:\/download)?/i;
+const DOWNLOAD_HINT_RE = /(bbcswebdav|xythos-download|\/download\b|[?&]download=)/i;
 
 function sanitizeName(input) {
   return String(input || "")
@@ -390,6 +393,149 @@ async function fetchResource(url) {
   };
 }
 
+function decodeBytesAsText(bytes) {
+  try {
+    return new TextDecoder("utf-8").decode(bytes);
+  } catch (_err) {
+    return "";
+  }
+}
+
+function isLikelyBinaryUrl(url) {
+  const lower = String(url || "").toLowerCase();
+  return (
+    DOWNLOAD_HINT_RE.test(lower) ||
+    BLACKBOARD_FILE_ROUTE_RE.test(lower) ||
+    /\/bbcswebdav\//i.test(lower) ||
+    FILE_EXT_RE.test(lower)
+  );
+}
+
+function buildFetchCandidates(rawUrl) {
+  const source = normalizeUrl(rawUrl);
+  if (!source) {
+    return [];
+  }
+
+  const out = new Set([source]);
+  let parsed;
+  try {
+    parsed = new URL(source);
+  } catch (_err) {
+    return Array.from(out);
+  }
+
+  const fileMatch = parsed.pathname.match(/^\/ultra\/courses\/([^/]+)\/outline\/file\/([^/?#]+)/i);
+  if (fileMatch) {
+    out.add(`${parsed.origin}/ultra/courses/${fileMatch[1]}/outline/file/${fileMatch[2]}/download`);
+    out.add(`${parsed.origin}/ultra/courses/${fileMatch[1]}/outline/file/${fileMatch[2]}?download=true`);
+  }
+
+  const docMatch = parsed.pathname.match(/^\/ultra\/courses\/([^/]+)\/outline\/edit\/document\/([^/?#]+)/i);
+  if (docMatch) {
+    out.add(`${parsed.origin}/ultra/courses/${docMatch[1]}/outline/edit/document/${docMatch[2]}/download`);
+  }
+
+  return Array.from(out);
+}
+
+function extractDownloadCandidatesFromHtml(html, baseUrl) {
+  const out = new Set();
+  const source = String(html || "");
+  const unescaped = source.replace(/\\\//g, "/");
+
+  const addCandidate = (raw) => {
+    const normalized = normalizeUrl(raw ? new URL(raw, baseUrl).toString() : "");
+    if (!normalized) {
+      return;
+    }
+    if (!isLikelyBinaryUrl(normalized)) {
+      return;
+    }
+    out.add(normalized);
+  };
+
+  const attrRe = /(?:href|src)\s*=\s*["']([^"']+)["']/gi;
+  for (const match of unescaped.matchAll(attrRe)) {
+    if (match[1]) {
+      try {
+        addCandidate(match[1]);
+      } catch (_err) {
+        // ignore malformed URLs
+      }
+    }
+  }
+
+  const urlRe = /https?:\/\/[^"'\\\s<>]+|\/[^"'\\\s<>]+/gi;
+  for (const match of unescaped.matchAll(urlRe)) {
+    const candidate = match[0];
+    if (!candidate) {
+      continue;
+    }
+    try {
+      addCandidate(candidate);
+    } catch (_err) {
+      // ignore malformed URLs
+    }
+  }
+
+  return Array.from(out).slice(0, 15);
+}
+
+async function fetchResourceWithFallback(url) {
+  const candidates = buildFetchCandidates(url);
+  const tried = new Set();
+  let htmlFallback = null;
+  let lastError = null;
+
+  const tryCandidate = async (candidateUrl) => {
+    if (!candidateUrl || tried.has(candidateUrl)) {
+      return null;
+    }
+    tried.add(candidateUrl);
+    const fetched = await fetchResource(candidateUrl);
+    const htmlLike = (fetched.meta.contentType || "").toLowerCase().includes("html") || looksLikeHtml(fetched.bytes);
+    if (!htmlLike) {
+      return { ...fetched, resolvedUrl: candidateUrl };
+    }
+    if (!htmlFallback) {
+      htmlFallback = { ...fetched, resolvedUrl: candidateUrl };
+    }
+    const html = decodeBytesAsText(fetched.bytes);
+    const embedded = extractDownloadCandidatesFromHtml(html, candidateUrl);
+    for (const embeddedUrl of embedded) {
+      try {
+        const nested = await tryCandidate(embeddedUrl);
+        if (nested) {
+          return nested;
+        }
+      } catch (_err) {
+        // continue trying other candidates
+      }
+    }
+    return null;
+  };
+
+  for (const candidate of candidates) {
+    try {
+      const resolved = await tryCandidate(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  if (htmlFallback) {
+    return htmlFallback;
+  }
+  if (lastError) {
+    throw lastError;
+  }
+  throw new Error(`Could not fetch resource: ${url}`);
+}
+
 function applyResourceFilters(url, meta, settings) {
   if (settings.excludeVideo && isVideoResource(url, meta.contentType)) {
     return { keep: false, reason: "video" };
@@ -474,21 +620,22 @@ async function processCourse(tabId, course, settings, historyRoot) {
 
     for (const resource of resources) {
       try {
-        const fetched = await fetchResource(resource.url);
-        const verdict = applyResourceFilters(resource.url, fetched.meta, settings);
+        const fetched = await fetchResourceWithFallback(resource.url);
+        const resolvedUrl = fetched.resolvedUrl || resource.url;
+        const verdict = applyResourceFilters(resolvedUrl, fetched.meta, settings);
         if (!verdict.keep) {
           skipped.push({ url: resource.url, reason: verdict.reason });
           continue;
         }
 
-        const signature = makeSignature(resource.url, fetched.meta);
+        const signature = makeSignature(resolvedUrl, fetched.meta);
         if (settings.incrementalMode && courseRoot[signature]) {
           skipped.push({ url: resource.url, reason: "incremental" });
           continue;
         }
 
         const filename = normalizeDownloadedFilename(
-          ensureFileName(resource.title, resource.url, fetched.meta.contentType),
+          ensureFileName(resource.title, resolvedUrl, fetched.meta.contentType),
           fetched.meta,
           fetched.bytes
         );
@@ -525,15 +672,16 @@ async function processCourse(tabId, course, settings, historyRoot) {
 
     for (const resource of resources) {
       try {
-        const fetched = await fetchResource(resource.url);
+        const fetched = await fetchResourceWithFallback(resource.url);
+        const resolvedUrl = fetched.resolvedUrl || resource.url;
         const meta = fetched.meta;
-        const verdict = applyResourceFilters(resource.url, meta, settings);
+        const verdict = applyResourceFilters(resolvedUrl, meta, settings);
         if (!verdict.keep) {
           skipped.push({ url: resource.url, reason: verdict.reason });
           continue;
         }
 
-        const signature = makeSignature(resource.url, meta);
+        const signature = makeSignature(resolvedUrl, meta);
         if (settings.incrementalMode && courseRoot[signature]) {
           skipped.push({ url: resource.url, reason: "incremental" });
           continue;
@@ -541,7 +689,7 @@ async function processCourse(tabId, course, settings, historyRoot) {
         courseRoot[signature] = true;
 
         const filename = normalizeDownloadedFilename(
-          ensureFileName(resource.title, resource.url, meta.contentType || ""),
+          ensureFileName(resource.title, resolvedUrl, meta.contentType || ""),
           meta,
           fetched.bytes
         );
