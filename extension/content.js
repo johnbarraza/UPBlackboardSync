@@ -1,7 +1,6 @@
 (function () {
   const FILE_EXT_RE = /\.(pdf|docx?|pptx?|xlsx?|zip|rar|txt|csv|rtf|odt|ods|odp|png|jpe?g|gif|svg|webp|mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i;
   const BLACKBOARD_FILE_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/file\/[^/?#]+/i;
-  const BLACKBOARD_DOCUMENT_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/edit\/document\/[^/?#]+/i;
   const MOJIBAKE_RE = /(?:\u00C3|\u00C2|\u00E2|\uFFFD)/;
   const ERROR_PAGE_HINTS = [
     "request[/announcement]",
@@ -677,7 +676,6 @@
     }
     return /bbcswebdav|xythos-download|render=inline|download/i.test(url) ||
       BLACKBOARD_FILE_ROUTE_RE.test(url) ||
-      BLACKBOARD_DOCUMENT_ROUTE_RE.test(url) ||
       FILE_EXT_RE.test(url);
   }
 
@@ -903,15 +901,22 @@
     if (!absoluteUrl || isStaticUiAssetUrl(absoluteUrl)) {
       return false;
     }
-    if (nodeHasCourseContentSignal(node)) {
-      return true;
-    }
 
     let parsed;
     try {
       parsed = new URL(absoluteUrl, location.href);
     } catch (_err) {
       return false;
+    }
+
+    // Ultra "document" routes are HTML pages, not binary materials.
+    // We still follow them as pages elsewhere, but don't treat them as direct resources.
+    if (/\/ultra\/courses\/[^/]+\/outline\/edit\/document\/[^/?#]+/i.test(parsed.pathname)) {
+      return false;
+    }
+
+    if (nodeHasCourseContentSignal(node)) {
+      return true;
     }
 
     const lower = absoluteUrl.toLowerCase();
@@ -923,7 +928,7 @@
     if (courseId && lower.includes(String(courseId).toLowerCase())) {
       return true;
     }
-    if (/bbcswebdav|xythos-download|\/outline\/file\/|\/outline\/edit\/document\//i.test(lower)) {
+    if (/bbcswebdav|xythos-download|\/outline\/file\//i.test(lower)) {
       return true;
     }
     return false;
