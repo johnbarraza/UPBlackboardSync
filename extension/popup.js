@@ -562,8 +562,9 @@ async function downloadSelected() {
     const reasonSummary = reasonEntries.length
       ? ` | reasons=${reasonEntries.map(([k, v]) => `${k}:${v}`).join(", ")}`
       : "";
+    const debugSummary = typeof s.debugEntries === "number" ? ` | debugEntries=${s.debugEntries}` : "";
     lines.push(
-      `- ${s.courseName}: pages=${s.crawledPages}, resources=${s.foundResources}, downloaded=${s.downloaded}, skipped=${s.skipped}${reasonSummary}`
+      `- ${s.courseName}: pages=${s.crawledPages}, resources=${s.foundResources}, downloaded=${s.downloaded}, skipped=${s.skipped}${reasonSummary}${debugSummary}`
     );
   }
   setStatus(lines.join("\n"));

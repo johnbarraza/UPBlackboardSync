@@ -472,6 +472,26 @@ function isLikelyBinaryUrl(url) {
   );
 }
 
+function normalizeBbcswebdavUrl(rawUrl) {
+  const normalized = normalizeUrl(rawUrl);
+  if (!normalized) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    if (!/\/bbcswebdav\//i.test(parsed.pathname)) {
+      return normalized;
+    }
+    parsed.searchParams.set("xythos-download", "true");
+    parsed.searchParams.delete("render");
+    parsed.searchParams.delete("isInlineRender");
+    return parsed.toString();
+  } catch (_err) {
+    return normalized;
+  }
+}
+
 function buildFetchCandidates(rawUrl) {
   const source = normalizeUrl(rawUrl);
   if (!source) {
@@ -497,6 +517,10 @@ function buildFetchCandidates(rawUrl) {
     out.add(`${parsed.origin}/ultra/courses/${docMatch[1]}/outline/edit/document/${docMatch[2]}/download`);
   }
 
+  if (/\/bbcswebdav\//i.test(parsed.pathname)) {
+    out.add(normalizeBbcswebdavUrl(source));
+  }
+
   return Array.from(out);
 }
 
@@ -504,39 +528,60 @@ function extractDownloadCandidatesFromHtml(html, baseUrl) {
   const out = new Set();
   const source = String(html || "");
   const unescaped = source.replace(/\\\//g, "/");
+  const decodedEntities = unescaped
+    .replace(/&amp;/gi, "&")
+    .replace(/&#x2f;/gi, "/")
+    .replace(/&#47;/g, "/")
+    .replace(/&quot;/gi, "\"");
 
   const addCandidate = (raw) => {
     const normalized = normalizeUrl(raw ? new URL(raw, baseUrl).toString() : "");
     if (!normalized) {
       return;
     }
-    if (!isLikelyBinaryUrl(normalized)) {
+    const bbNormalized = normalizeBbcswebdavUrl(normalized);
+    if (!isLikelyBinaryUrl(bbNormalized)) {
       return;
     }
-    out.add(normalized);
+    out.add(bbNormalized);
   };
 
+  const inputs = [unescaped, decodedEntities];
   const attrRe = /(?:href|src)\s*=\s*["']([^"']+)["']/gi;
-  for (const match of unescaped.matchAll(attrRe)) {
-    if (match[1]) {
+  const iframeRe = /<iframe[^>]+src\s*=\s*["']([^"']+)["']/gi;
+  const urlRe = /https?:\/\/[^"'\\\s<>]+|\/[^"'\\\s<>]+/gi;
+
+  for (const text of inputs) {
+    for (const match of text.matchAll(attrRe)) {
+      if (match[1]) {
+        try {
+          addCandidate(match[1]);
+        } catch (_err) {
+          // ignore malformed URLs
+        }
+      }
+    }
+
+    for (const match of text.matchAll(iframeRe)) {
+      if (match[1]) {
+        try {
+          addCandidate(match[1]);
+        } catch (_err) {
+          // ignore malformed URLs
+        }
+      }
+    }
+
+    for (const match of text.matchAll(urlRe)) {
+      const candidate = match[0];
+      if (!candidate) {
+        continue;
+      }
       try {
-        addCandidate(match[1]);
+        addCandidate(candidate);
       } catch (_err) {
         // ignore malformed URLs
       }
-    }
-  }
-
-  const urlRe = /https?:\/\/[^"'\\\s<>]+|\/[^"'\\\s<>]+/gi;
-  for (const match of unescaped.matchAll(urlRe)) {
-    const candidate = match[0];
-    if (!candidate) {
-      continue;
-    }
-    try {
-      addCandidate(candidate);
-    } catch (_err) {
-      // ignore malformed URLs
     }
   }
 
