@@ -173,7 +173,7 @@ function filterCourses(list) {
 
 function renderCycleFilterOptions() {
   const select = document.getElementById("cycle-filter");
-  const previous = select.value || "__current__";
+  const previous = select.value || "__all__";
   const seen = new Map();
 
   for (const c of courses) {
@@ -219,7 +219,7 @@ function renderCycleFilterOptions() {
   }
 
   const validValues = new Set(Array.from(select.options).map((o) => o.value));
-  select.value = validValues.has(previous) ? previous : "__current__";
+  select.value = validValues.has(previous) ? previous : "__all__";
 }
 
 function renderCourseList() {

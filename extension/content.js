@@ -277,7 +277,7 @@
       /((?:19|20)\d{2}\s*[-/_ ]\s*(?:0?[1-9]|1[0-2]|I{1,3}|IV|V|A|B|C|D|SPRING|SUMMER|FALL|AUTUMN|WINTER|PRIMAVERA|VERANO|OTONO|INVIERNO))/ig,
       /((?:SEMESTER|SEMESTRE|TERM|CICLO|PERIODO|QUARTER|TRIMESTRE)\s*[A-Z0-9IVX]+)/ig,
       /((?:19|20)\d{2}\s*(?:SPRING|SUMMER|FALL|AUTUMN|WINTER|PRIMAVERA|VERANO|OTONO|INVIERNO))/ig,
-      /((?:PRE|POST|CICLO|TERM|SEMESTRE)?\s*(?:19|20)\d{2}(?:[_\- ](?:0?[1-9]|1[0-2]|I{1,3}|IV|V|PRE|POST))?)/ig
+      /(?:^|[^0-9])((?:PRE|POST|CICLO|TERM|SEMESTRE)?\s*(?:19|20)\d{2}(?:[_\- ](?:0?[1-9]|1[0-2]|I{1,3}|IV|V|PRE|POST))?)(?=$|[^0-9])/ig
     ];
     for (const pattern of patterns) {
       for (const match of clean.matchAll(pattern)) {
