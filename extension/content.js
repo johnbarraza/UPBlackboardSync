@@ -782,7 +782,7 @@
     ];
   }
 
-  function collectAnnouncementItems(doc) {
+  function collectAnnouncementItems(doc, pageUrl, fallbackCourseId) {
     const rows = Array.from(doc.querySelectorAll("tr.announcement-item-row"));
     const items = [];
 
@@ -802,7 +802,21 @@
           "")
       ).trim();
       const rowId = ((anchor && anchor.id) || row.getAttribute("id") || "").trim();
-      const stableId = rowId || `${title}::${posted}`;
+      const idMatch = rowId.match(/list-item-title-(_[^_]+_1)/i);
+      const announcementId = (idMatch && idMatch[1]) || "";
+      const stableId = announcementId || rowId || `${title}::${posted}`;
+      const courseId = parseCourseId(pageUrl) || fallbackCourseId || parseCourseId(location.href);
+      let detailUrl = "";
+      if (announcementId && courseId) {
+        const origin = (() => {
+          try {
+            return new URL(pageUrl || location.href).origin;
+          } catch (_err) {
+            return location.origin;
+          }
+        })();
+        detailUrl = `${origin}/ultra/courses/${encodeURIComponent(courseId)}/announcements/announcement-detail?courseId=${encodeURIComponent(courseId)}&announcementId=${encodeURIComponent(announcementId)}`;
+      }
 
       const lines = [`Title: ${title}`];
       if (posted) {
@@ -815,6 +829,8 @@
 
       items.push({
         id: stableId,
+        announcementId,
+        detailUrl,
         title,
         posted,
         body: `${lines.join("\n").trim()}\n`
@@ -822,6 +838,42 @@
     }
 
     return items;
+  }
+
+  function extractAnnouncementDetail(pageUrl, doc) {
+    const parsed = new URL(pageUrl, location.href);
+    const announcementId = parsed.searchParams.get("announcementId") || "";
+    if (!announcementId) {
+      return null;
+    }
+
+    const title = sanitizeName(
+      (doc.querySelector(".announcement-title-detail, .panel-title, h1, h2") &&
+        doc.querySelector(".announcement-title-detail, .panel-title, h1, h2").textContent) ||
+      (doc.querySelector("title") && doc.querySelector("title").textContent) ||
+      `announcement-${announcementId}`
+    );
+
+    const bodyNode =
+      doc.querySelector(".panel-container .ql-editor") ||
+      doc.querySelector(".panel-container .body-text") ||
+      doc.querySelector(".panel-content .body-text");
+    const bodyText = fixMojibake((bodyNode && bodyNode.textContent) || "")
+      .replace(/\r/g, "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join("\n");
+
+    if (!bodyText) {
+      return null;
+    }
+
+    return {
+      id: announcementId,
+      title,
+      body: `Title: ${title}\n\n${bodyText}\n`
+    };
   }
 
   function inferUltraResourceUrlFromNode(node, pageUrl, courseId) {
@@ -1115,7 +1167,13 @@
     );
     const pageType = classifyPage(pageUrl);
 
-    if (!isErrorPage && settings.contentTypes.text && settings.contentTypes[pageType] !== false) {
+    const shouldStoreRawPage =
+      !isErrorPage &&
+      settings.contentTypes.text &&
+      settings.contentTypes[pageType] !== false &&
+      pageType !== "announcements";
+
+    if (shouldStoreRawPage) {
       textFiles.push({
         path: `${pageType}/${pageTitle}.html`,
         body: html
@@ -1167,22 +1225,56 @@
 
     if (hasAnnouncementSignal) {
       if (settings.contentTypes.text && settings.contentTypes.announcements !== false) {
-        const items = collectAnnouncementItems(doc);
-        for (const item of items) {
-          const dedupeKey = `${course.id}::${item.id}`;
-          if (seenAnnouncementItems.has(dedupeKey)) {
-            continue;
+        const items = collectAnnouncementItems(doc, pageUrl, course.id);
+        if (items.length === 0) {
+          const emptyKey = `${course.id}::__empty_announcements__`;
+          if (!seenAnnouncementItems.has(emptyKey)) {
+            seenAnnouncementItems.add(emptyKey);
+            textFiles.push({
+              path: "announcements/_no_announcements.txt",
+              body: "No announcements found.\n"
+            });
           }
-          seenAnnouncementItems.add(dedupeKey);
-          const postedPrefix = item.posted ? `${sanitizeName(item.posted)} - ` : "";
-          textFiles.push({
-            path: `announcements/${postedPrefix}${item.title}.txt`,
-            body: item.body
-          });
+        }
+        for (const item of items) {
+          if (item.detailUrl) {
+            addUrlToQueue(queue, seenPages, item.detailUrl);
+          } else {
+            const dedupeKey = `${course.id}::${item.id}`;
+            if (seenAnnouncementItems.has(dedupeKey)) {
+              continue;
+            }
+            seenAnnouncementItems.add(dedupeKey);
+            const postedPrefix = item.posted ? `${sanitizeName(item.posted)} - ` : "";
+            textFiles.push({
+              path: `announcements/${postedPrefix}${item.title}.txt`,
+              body: item.body
+            });
+          }
         }
       }
       for (const seed of buildCourseSeedUrls(course.id, pageUrl)) {
         addUrlToQueue(queue, seenPages, seed);
+      }
+    }
+
+    const isAnnouncementDetailPage = /\/announcements\/announcement-detail/i.test(pageUrl);
+    if (
+      !isErrorPage &&
+      isAnnouncementDetailPage &&
+      settings.contentTypes.text &&
+      settings.contentTypes.announcements !== false
+    ) {
+      const detail = extractAnnouncementDetail(pageUrl, doc);
+      if (detail) {
+        const dedupeKey = `${course.id}::${detail.id}`;
+        if (!seenAnnouncementItems.has(dedupeKey)) {
+          seenAnnouncementItems.add(dedupeKey);
+          textFiles.push({
+            path: `announcements/${detail.title}.txt`,
+            body: detail.body
+          });
+        }
       }
     }
   }
