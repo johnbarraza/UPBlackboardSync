@@ -3,9 +3,23 @@ let courses = [];
 let settings = null;
 let selectedCourseIds = new Set();
 let hasSelectionState = false;
+let detectedByCourse = new Map();
+let selectedMaterialKeys = new Set();
 
 function setStatus(message) {
   document.getElementById("status").textContent = message;
+}
+
+function normalizeUrl(value) {
+  try {
+    return new URL(value).toString();
+  } catch (_err) {
+    return "";
+  }
+}
+
+function materialKey(courseId, url) {
+  return `${courseId}::${normalizeUrl(url)}`;
 }
 
 function normalizeText(value) {
@@ -86,6 +100,11 @@ function detectCurrentCycle(list) {
 
 function getSelectedCourseIds() {
   return Array.from(selectedCourseIds);
+}
+
+function getSelectedCourses() {
+  const selectedIds = new Set(getSelectedCourseIds());
+  return courses.filter((c) => selectedIds.has(c.id));
 }
 
 function summarizeSettings(s) {
@@ -235,6 +254,167 @@ function renderCourseList() {
   }
 }
 
+function clearMaterialPreview() {
+  detectedByCourse = new Map();
+  selectedMaterialKeys = new Set();
+  renderMaterialList();
+}
+
+function setAllDetectedMaterials(checked) {
+  if (checked) {
+    for (const [courseId, data] of detectedByCourse.entries()) {
+      for (const item of data.items || []) {
+        selectedMaterialKeys.add(materialKey(courseId, item.url));
+      }
+    }
+  } else {
+    selectedMaterialKeys = new Set();
+  }
+  renderMaterialList();
+}
+
+function renderMaterialList() {
+  const summary = document.getElementById("material-summary");
+  const container = document.getElementById("material-list");
+  container.innerHTML = "";
+
+  if (detectedByCourse.size === 0) {
+    summary.textContent = "No preview yet.";
+    container.innerHTML = "<div class='muted'>Run Preview materials to inspect detected files/folders.</div>";
+    return;
+  }
+
+  let total = 0;
+  let selected = 0;
+
+  for (const [courseId, data] of detectedByCourse.entries()) {
+    const section = document.createElement("div");
+    section.className = "material-course";
+
+    const title = document.createElement("div");
+    title.className = "material-course-title";
+    const itemCount = (data.items || []).length;
+    title.textContent = `${data.course.name} (${itemCount})`;
+    section.appendChild(title);
+
+    const grouped = new Map();
+    const sorted = [...(data.items || [])].sort((a, b) => {
+      const fa = String(a.folder || "");
+      const fb = String(b.folder || "");
+      if (fa !== fb) {
+        return fa.localeCompare(fb);
+      }
+      return String(a.title || "").localeCompare(String(b.title || ""));
+    });
+
+    for (const item of sorted) {
+      const folder = item.folder || "files";
+      if (!grouped.has(folder)) {
+        grouped.set(folder, []);
+      }
+      grouped.get(folder).push(item);
+    }
+
+    for (const [folder, items] of grouped.entries()) {
+      const folderTitle = document.createElement("div");
+      folderTitle.className = "material-folder-title";
+      folderTitle.textContent = folder;
+      section.appendChild(folderTitle);
+
+      for (const item of items) {
+        const key = materialKey(courseId, item.url);
+        const checked = selectedMaterialKeys.has(key);
+        total += 1;
+        if (checked) {
+          selected += 1;
+        }
+
+        const row = document.createElement("label");
+        row.className = "material-item";
+
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.className = "material-checkbox";
+        input.dataset.courseId = courseId;
+        input.dataset.url = item.url;
+        input.checked = checked;
+
+        const textWrap = document.createElement("div");
+
+        const name = document.createElement("div");
+        name.className = "material-name";
+        name.textContent = item.title || "resource";
+
+        const url = document.createElement("div");
+        url.className = "material-url";
+        url.textContent = item.url || "";
+
+        textWrap.appendChild(name);
+        textWrap.appendChild(url);
+
+        row.appendChild(input);
+        row.appendChild(textWrap);
+        section.appendChild(row);
+      }
+    }
+
+    container.appendChild(section);
+  }
+
+  summary.textContent = `Detected ${total} material(s). Selected ${selected}.`;
+}
+
+async function previewSelectedMaterials() {
+  const selectedCourses = getSelectedCourses();
+  if (selectedCourses.length === 0) {
+    setStatus("Select at least one course.");
+    return;
+  }
+
+  setStatus(`Previewing materials for ${selectedCourses.length} course(s)...`);
+  detectedByCourse = new Map();
+  selectedMaterialKeys = new Set();
+
+  for (const course of selectedCourses) {
+    try {
+      const resp = await chrome.tabs.sendMessage(activeTabId, {
+        type: "crawl-course",
+        course,
+        settings
+      });
+      if (!resp || !resp.ok || !resp.data) {
+        detectedByCourse.set(course.id, { course, items: [] });
+        continue;
+      }
+
+      const unique = new Map();
+      for (const item of resp.data.resources || []) {
+        const url = normalizeUrl(item.url);
+        if (!url || unique.has(url)) {
+          continue;
+        }
+        unique.set(url, {
+          url,
+          title: item.title || "resource",
+          folder: item.folder || "files",
+          sourcePage: item.sourcePage || ""
+        });
+      }
+
+      const items = Array.from(unique.values());
+      detectedByCourse.set(course.id, { course, items });
+      for (const item of items) {
+        selectedMaterialKeys.add(materialKey(course.id, item.url));
+      }
+    } catch (_err) {
+      detectedByCourse.set(course.id, { course, items: [] });
+    }
+  }
+
+  renderMaterialList();
+  setStatus("Preview completed. Review detected items and run download.");
+}
+
 async function getActiveTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   return tabs[0];
@@ -312,12 +492,12 @@ async function refreshCourses(preserveSelection = true) {
   applyCourseSet(nextCourses, preserveSelection);
   renderCycleFilterOptions();
   renderCourseList();
+  clearMaterialPreview();
   setStatus(`Detected ${courses.length} course(s).`);
 }
 
 async function downloadSelected() {
-  const selectedIds = new Set(getSelectedCourseIds());
-  const selectedCourses = courses.filter((c) => selectedIds.has(c.id));
+  const selectedCourses = getSelectedCourses();
 
   if (selectedCourses.length === 0) {
     setStatus("Select at least one course.");
@@ -325,13 +505,48 @@ async function downloadSelected() {
   }
 
   setStatus(`Starting download for ${selectedCourses.length} course(s)...`);
+  const payload = {
+    tabId: activeTabId,
+    courses: selectedCourses
+  };
+
+  if (detectedByCourse.size > 0) {
+    for (const course of selectedCourses) {
+      if (!detectedByCourse.has(course.id)) {
+        setStatus("Preview is stale. Run Preview materials again.");
+        return;
+      }
+    }
+
+    const selectedResourceUrlsByCourse = {};
+    let totalSelected = 0;
+
+    for (const course of selectedCourses) {
+      const data = detectedByCourse.get(course.id) || { items: [] };
+      const urls = [];
+      for (const item of data.items || []) {
+        const key = materialKey(course.id, item.url);
+        if (selectedMaterialKeys.has(key)) {
+          urls.push(item.url);
+        }
+      }
+      if (urls.length > 0) {
+        selectedResourceUrlsByCourse[course.id] = urls;
+        totalSelected += urls.length;
+      }
+    }
+
+    if (totalSelected === 0) {
+      setStatus("No detected materials selected. Use Preview materials first.");
+      return;
+    }
+
+    payload.selectedResourceUrlsByCourse = selectedResourceUrlsByCourse;
+  }
 
   const resp = await chrome.runtime.sendMessage({
     type: "download-courses",
-    payload: {
-      tabId: activeTabId,
-      courses: selectedCourses
-    }
+    payload
   });
 
   if (!resp || !resp.ok) {
@@ -371,6 +586,11 @@ document.getElementById("show-active").addEventListener("change", renderCourseLi
 document.getElementById("show-past").addEventListener("change", renderCourseList);
 document.getElementById("cycle-filter").addEventListener("change", renderCourseList);
 document.getElementById("open-settings").addEventListener("click", () => chrome.runtime.openOptionsPage());
+document.getElementById("preview-selected").addEventListener("click", () => {
+  previewSelectedMaterials().catch((err) => setStatus(`Error: ${String(err)}`));
+});
+document.getElementById("select-all-materials").addEventListener("click", () => setAllDetectedMaterials(true));
+document.getElementById("clear-all-materials").addEventListener("click", () => setAllDetectedMaterials(false));
 document.getElementById("course-list").addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement)) {
@@ -385,6 +605,30 @@ document.getElementById("course-list").addEventListener("change", (event) => {
   } else {
     selectedCourseIds.delete(target.value);
   }
+});
+
+document.getElementById("material-list").addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  if (!target.classList.contains("material-checkbox")) {
+    return;
+  }
+
+  const courseId = target.dataset.courseId || "";
+  const url = target.dataset.url || "";
+  const key = materialKey(courseId, url);
+  if (!key.includes("::")) {
+    return;
+  }
+
+  if (target.checked) {
+    selectedMaterialKeys.add(key);
+  } else {
+    selectedMaterialKeys.delete(key);
+  }
+  renderMaterialList();
 });
 
 init().catch((err) => setStatus(`Init error: ${String(err)}`));

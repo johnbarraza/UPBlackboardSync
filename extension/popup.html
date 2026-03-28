@@ -105,6 +105,57 @@
       font-size: 11px;
       color: var(--muted);
     }
+    #material-list {
+      max-height: 260px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      padding: 8px;
+      margin-top: 8px;
+    }
+    .material-course {
+      margin: 8px 0;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+    .material-course:first-child {
+      margin-top: 0;
+      border-top: 0;
+      padding-top: 0;
+    }
+    .material-course-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    .material-folder-title {
+      font-size: 11px;
+      color: var(--muted);
+      margin: 6px 0 2px;
+      font-weight: 700;
+    }
+    .material-item {
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+      padding: 4px 2px;
+      border-radius: 6px;
+    }
+    .material-item:hover {
+      background: #f5f8ff;
+    }
+    .material-name {
+      font-size: 12px;
+      line-height: 1.25;
+      word-break: break-word;
+    }
+    .material-url {
+      font-size: 10px;
+      color: var(--muted);
+      word-break: break-all;
+    }
     #status {
       margin-top: 8px;
       font-size: 12px;
@@ -140,6 +191,16 @@
   </div>
 
   <div id="course-list" class="card"></div>
+
+  <div class="card">
+    <div class="row">
+      <button id="preview-selected" class="secondary">Preview materials</button>
+      <button id="select-all-materials" class="secondary">Select detected</button>
+      <button id="clear-all-materials" class="secondary">Clear detected</button>
+    </div>
+    <div id="material-summary" class="muted" style="margin-top:8px;">No preview yet.</div>
+    <div id="material-list"><div class="muted">Run Preview materials to inspect detected files/folders.</div></div>
+  </div>
 
   <div class="card">
     <div id="settings-summary" class="muted"></div>

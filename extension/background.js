@@ -594,7 +594,7 @@ async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
   });
 }
 
-async function processCourse(tabId, course, settings, historyRoot) {
+async function processCourse(tabId, course, settings, historyRoot, selectedResourceUrls) {
   const fallbackUrl = settings.preferredHost
     ? `https://${settings.preferredHost}/ultra/courses/${encodeURIComponent(course.id)}/outline`
     : "";
@@ -615,7 +615,15 @@ async function processCourse(tabId, course, settings, historyRoot) {
   }
 
   const data = crawlResp.data;
-  const resources = dedupeResources(data.resources);
+  let resources = dedupeResources(data.resources);
+  if (Array.isArray(selectedResourceUrls)) {
+    const allowed = new Set(
+      selectedResourceUrls
+        .map((url) => normalizeUrl(url))
+        .filter(Boolean)
+    );
+    resources = resources.filter((item) => allowed.has(normalizeUrl(item.url)));
+  }
   const textFiles = data.textFiles || [];
   const gradeRows = data.gradeRows || [];
   const downloaded = [];
@@ -756,6 +764,7 @@ async function startDownloads(payload) {
   const settings = await getSettings();
   const tabId = Number(payload && payload.tabId);
   const courses = (payload && payload.courses) || [];
+  const selectedByCourse = (payload && payload.selectedResourceUrlsByCourse) || {};
 
   if (!tabId || courses.length === 0) {
     throw new Error("No courses selected or tab unavailable.");
@@ -765,7 +774,10 @@ async function startDownloads(payload) {
   const summaries = [];
 
   for (const course of courses) {
-    const summary = await processCourse(tabId, course, settings, history);
+    const selectedResourceUrls = Array.isArray(selectedByCourse[course.id])
+      ? selectedByCourse[course.id]
+      : null;
+    const summary = await processCourse(tabId, course, settings, history, selectedResourceUrls);
     summaries.push(summary);
   }
 
