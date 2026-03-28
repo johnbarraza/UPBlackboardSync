@@ -7,7 +7,10 @@
     "request[/announcement]",
     "does not contain handler parameter named 'method'",
     "whitespace in the label text",
-    "for reference, the error id is"
+    "for reference, the error id is",
+    "whitelabel error page",
+    "oops! something went wrong",
+    "an error has occurred"
   ];
   const STATIC_ASSET_HOST_RE = /(^|\.)blackboardcdn\.com$/i;
   const COURSE_CONTENT_ANALYTICS_RE = /content\.item\.course\.outline\.coursecontent\.link/i;
@@ -930,7 +933,64 @@
     const title = (doc.querySelector("title") && doc.querySelector("title").textContent) || "";
     const bodyText = (doc.body && doc.body.textContent) || String(html || "");
     const sample = `${title}\n${bodyText}\n${pageUrl}`.toLowerCase();
+    if (/^\s*error\b/i.test(title)) {
+      return true;
+    }
+    if (/\berror\s*[–-]/i.test(title)) {
+      return true;
+    }
     return ERROR_PAGE_HINTS.some((hint) => sample.includes(hint));
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function collectCollapsedContentToggles(doc) {
+    const scope = doc.querySelector(".js-content-outline, .course-outline-content-list") || doc;
+    const selectors = [
+      "button[id^='learning-module-title-'][aria-expanded='false']",
+      "button[id^='folder-title-'][aria-expanded='false']",
+      "button[data-analytics-id='course.learning.module.base.item.toggleLm.button'][aria-expanded='false']",
+      "button[data-analytics-id='content.item.folder.toggleFolder.button'][aria-expanded='false']",
+      "button[aria-controls^='learning-module-contents-'][aria-expanded='false']",
+      "button[aria-controls^='folder-contents-'][aria-expanded='false']"
+    ];
+    const out = [];
+    const seen = new Set();
+    for (const selector of selectors) {
+      for (const btn of scope.querySelectorAll(selector)) {
+        if (!(btn instanceof HTMLButtonElement) || btn.disabled) {
+          continue;
+        }
+        const key = btn.id || `${btn.getAttribute("aria-controls") || ""}::${btn.textContent || ""}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        out.push(btn);
+      }
+    }
+    return out;
+  }
+
+  async function expandAllCourseContent(doc) {
+    // Blackboard Ultra lazily renders children only after expand.
+    for (let round = 0; round < 6; round += 1) {
+      const collapsed = collectCollapsedContentToggles(doc);
+      if (collapsed.length === 0) {
+        return;
+      }
+      for (const button of collapsed) {
+        try {
+          button.click();
+        } catch (_err) {
+          // ignore UI interaction issues
+        }
+        await sleep(90);
+      }
+      await sleep(280);
+    }
   }
 
   function parsePageContent(
@@ -1026,6 +1086,7 @@
 
     const currentCourseId = parseCourseId(location.href);
     if (currentCourseId && currentCourseId === course.id) {
+      await expandAllCourseContent(document);
       const liveHtml = document.documentElement
         ? document.documentElement.outerHTML
         : document.body.innerHTML;
