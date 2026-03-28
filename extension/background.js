@@ -849,6 +849,50 @@ function dedupeResources(resources) {
   return Array.from(map.values());
 }
 
+function sanitizeFolderPath(path) {
+  const parts = String(path || "")
+    .split("/")
+    .map((segment) => fixMojibake(String(segment || ""))
+      .normalize("NFC")
+      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 180))
+    .filter(Boolean);
+  return parts.join("/");
+}
+
+function addFolderWithParents(folderSet, folderPath) {
+  const normalized = sanitizeFolderPath(folderPath);
+  if (!normalized) {
+    return;
+  }
+  const parts = normalized.split("/").filter(Boolean);
+  for (let i = 1; i <= parts.length; i += 1) {
+    folderSet.add(parts.slice(0, i).join("/"));
+  }
+}
+
+function buildFolderManifest(resources, explicitFolders) {
+  const folders = new Set();
+  for (const path of explicitFolders || []) {
+    addFolderWithParents(folders, path);
+  }
+  for (const resource of resources || []) {
+    addFolderWithParents(folders, resource.folder || "files");
+  }
+  return Array.from(folders);
+}
+
+function directoryFromRelativePath(path) {
+  const raw = String(path || "");
+  const idx = raw.lastIndexOf("/");
+  if (idx <= 0) {
+    return "";
+  }
+  return raw.slice(0, idx);
+}
+
 async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
   const bytes = textOrBytes instanceof Uint8Array ? textOrBytes : toUtf8Bytes(textOrBytes);
   const url = uint8ToDataUrl(bytes, mime);
@@ -881,10 +925,11 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
         .map((item) => ({
           url: canonicalResourceUrl(item.url),
           title: sanitizeName(item.title || ""),
-          folder: sanitizeName(item.folder || "files"),
+          folder: sanitizeFolderPath(item.folder || "files"),
           sourcePage: normalizeUrl(item.sourcePage || "") || resolvedCourse.url || ""
         }))
         .filter((item) => !!item.url),
+      folders: [],
       textFiles: [],
       gradeRows: []
     };
@@ -912,6 +957,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
   }
   const textFiles = data.textFiles || [];
   const gradeRows = data.gradeRows || [];
+  const folderManifest = buildFolderManifest(resources, data.folders || []);
   const downloaded = [];
   const skipped = [];
 
@@ -924,6 +970,19 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
 
   if (settings.zipBundling) {
     const filesForZip = [];
+    const zipFolderEntries = new Set();
+
+    for (const folderPath of folderManifest) {
+      const folderEntry = `${courseFolder}/${folderPath}/`;
+      if (zipFolderEntries.has(folderEntry)) {
+        continue;
+      }
+      zipFolderEntries.add(folderEntry);
+      filesForZip.push({
+        name: folderEntry,
+        bytes: new Uint8Array(0)
+      });
+    }
 
     for (const textFile of textFiles) {
       filesForZip.push({
@@ -1005,7 +1064,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
           }
           continue;
         }
-        const folder = sanitizeName(resource.folder || "files");
+        const folder = sanitizeFolderPath(resource.folder || "files");
         const zipPath = `${courseFolder}/${folder}/${filename}`;
         filesForZip.push({ name: zipPath, bytes: fetched.bytes });
         courseRoot[signature] = true;
@@ -1070,9 +1129,12 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       await downloadDataFile(zipName, "application/zip", zip, settings.conflictHandling);
     }
   } else {
+    const nonEmptyFolders = new Set();
+
     for (const textFile of textFiles) {
       const filename = `${courseFolder}/${textFile.path}`;
       await downloadDataFile(filename, "text/html", textFile.body, settings.conflictHandling);
+      addFolderWithParents(nonEmptyFolders, directoryFromRelativePath(textFile.path));
       if (settings.delayMs > 0) {
         await sleep(settings.delayMs);
       }
@@ -1152,13 +1214,14 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
           }
           continue;
         }
-        const folder = sanitizeName(resource.folder || "files");
+        const folder = sanitizeFolderPath(resource.folder || "files");
         await downloadDataFile(
           `${courseFolder}/${folder}/${filename}`,
           meta.contentType || "application/octet-stream",
           fetched.bytes,
           settings.conflictHandling
         );
+        addFolderWithParents(nonEmptyFolders, folder);
         courseRoot[signature] = true;
         downloaded.push(resource.url);
         if (debugEnabled) {
@@ -1218,6 +1281,17 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
         `${courseFolder}/debug/debug_report.json`,
         "application/json",
         JSON.stringify(report, null, 2),
+        settings.conflictHandling
+      );
+      addFolderWithParents(nonEmptyFolders, "debug");
+    }
+
+    const emptyFolders = folderManifest.filter((folderPath) => !nonEmptyFolders.has(folderPath));
+    for (const folderPath of emptyFolders) {
+      await downloadDataFile(
+        `${courseFolder}/${folderPath}/.keep`,
+        "text/plain",
+        "",
         settings.conflictHandling
       );
     }

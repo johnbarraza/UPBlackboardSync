@@ -1090,7 +1090,12 @@
   }
 
   function addUniquePathSegment(segments, seen, value) {
-    const label = sanitizeName(value);
+    const label = fixMojibake(String(value || ""))
+      .normalize("NFC")
+      .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 180);
     if (!label) {
       return;
     }
@@ -1100,6 +1105,47 @@
     }
     seen.add(key);
     segments.unshift(label);
+  }
+
+  function normalizeFolderPath(path) {
+    return String(path || "")
+      .split("/")
+      .map((segment) => fixMojibake(String(segment || ""))
+        .normalize("NFC")
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 180))
+      .filter(Boolean)
+      .join("/");
+  }
+
+  function addFolderPathWithParents(folderPaths, folderPath) {
+    const normalized = normalizeFolderPath(folderPath);
+    if (!normalized) {
+      return;
+    }
+    const parts = normalized.split("/").filter(Boolean);
+    for (let i = 1; i <= parts.length; i += 1) {
+      folderPaths.add(parts.slice(0, i).join("/"));
+    }
+  }
+
+  function collectFolderPaths(doc, pageType) {
+    const out = new Set();
+    const selectors = [
+      "button[id^='folder-title-']",
+      "button[id^='learning-module-title-']",
+      "button[data-analytics-id='content.item.folder.toggleFolder.button']",
+      "button[data-analytics-id='course.learning.module.base.item.toggleLm.button']"
+    ];
+    for (const selector of selectors) {
+      for (const node of doc.querySelectorAll(selector)) {
+        const path = extractFolderPath(node, doc, pageType);
+        addFolderPathWithParents(out, path);
+      }
+    }
+    return out;
   }
 
   function extractFolderPath(node, doc, pageType) {
@@ -1238,7 +1284,8 @@
     resources,
     textFiles,
     gradeRows,
-    seenAnnouncementItems
+    seenAnnouncementItems,
+    folderPaths
   ) {
     const isErrorPage = isBlackboardErrorPage(doc, html, pageUrl);
     const pageTitle = sanitizeName(
@@ -1246,6 +1293,10 @@
       pageUrl
     );
     const pageType = classifyPage(pageUrl);
+
+    for (const folderPath of collectFolderPaths(doc, pageType)) {
+      folderPaths.add(folderPath);
+    }
 
     const shouldStoreRawPage =
       !isErrorPage &&
@@ -1280,7 +1331,8 @@
       if (isLikelyDownloadable(absolute)) {
         const key = `${absolute}::${label}`;
         if (!seenResources.has(key)) {
-          const folderPath = extractFolderPath(node, doc, pageType);
+          const folderPath = normalizeFolderPath(extractFolderPath(node, doc, pageType));
+          addFolderPathWithParents(folderPaths, folderPath);
           resources.push({
             url: absolute,
             title: label,
@@ -1368,6 +1420,7 @@
     const resources = [];
     const textFiles = [];
     const gradeRows = [];
+    const folderPaths = new Set();
 
     addUrlToQueue(queue, seenPages, toAbsolute(course.url, location.href));
     for (const seed of buildCourseSeedUrls(course.id, course.url || location.href)) {
@@ -1394,7 +1447,8 @@
         resources,
         textFiles,
         gradeRows,
-        seenAnnouncementItems
+        seenAnnouncementItems,
+        folderPaths
       );
 
       for (const seed of buildCourseSeedUrls(course.id, liveUrl)) {
@@ -1429,7 +1483,8 @@
         resources,
         textFiles,
         gradeRows,
-        seenAnnouncementItems
+        seenAnnouncementItems,
+        folderPaths
       );
     }
 
@@ -1437,6 +1492,7 @@
       course,
       crawledPages: seenPages.size,
       resources,
+      folders: Array.from(folderPaths),
       textFiles,
       gradeRows
     };
