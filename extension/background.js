@@ -893,6 +893,76 @@ function directoryFromRelativePath(path) {
   return raw.slice(0, idx);
 }
 
+function detectBrowserFromUserAgent(userAgent) {
+  const ua = String(userAgent || "");
+  let match = ua.match(/Edg\/([0-9.]+)/);
+  if (match) {
+    return { name: "Edge", version: match[1] };
+  }
+  match = ua.match(/OPR\/([0-9.]+)/);
+  if (match) {
+    return { name: "Opera", version: match[1] };
+  }
+  match = ua.match(/Chrome\/([0-9.]+)/);
+  if (match) {
+    return { name: "Chrome", version: match[1] };
+  }
+  match = ua.match(/Firefox\/([0-9.]+)/);
+  if (match) {
+    return { name: "Firefox", version: match[1] };
+  }
+  if (/Safari\//.test(ua) && /Version\//.test(ua)) {
+    match = ua.match(/Version\/([0-9.]+)/);
+    if (match) {
+      return { name: "Safari", version: match[1] };
+    }
+  }
+  return { name: "Unknown", version: "" };
+}
+
+function detectOsFamily(platform, userAgent) {
+  const source = `${String(platform || "")} ${String(userAgent || "")}`.toLowerCase();
+  if (source.includes("windows")) {
+    return "windows";
+  }
+  if (
+    source.includes("mac") ||
+    source.includes("darwin") ||
+    source.includes("iphone") ||
+    source.includes("ipad") ||
+    source.includes("ios")
+  ) {
+    return "apple";
+  }
+  if (source.includes("android")) {
+    return "android";
+  }
+  if (source.includes("linux")) {
+    return "linux";
+  }
+  return "unknown";
+}
+
+function getDebugRuntimeInfo() {
+  const manifest = chrome && chrome.runtime && chrome.runtime.getManifest
+    ? chrome.runtime.getManifest()
+    : null;
+  const userAgent = typeof navigator !== "undefined" ? String(navigator.userAgent || "") : "";
+  const platform = typeof navigator !== "undefined"
+    ? String((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "")
+    : "";
+  const browser = detectBrowserFromUserAgent(userAgent);
+  return {
+    extensionName: manifest && manifest.name ? String(manifest.name) : "",
+    extensionVersion: manifest && manifest.version ? String(manifest.version) : "",
+    browserName: browser.name,
+    browserVersion: browser.version,
+    os: detectOsFamily(platform, userAgent),
+    platform,
+    userAgent
+  };
+}
+
 async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
   const bytes = textOrBytes instanceof Uint8Array ? textOrBytes : toUtf8Bytes(textOrBytes);
   const url = uint8ToDataUrl(bytes, mime);
@@ -907,6 +977,7 @@ async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
 async function processCourse(tabId, course, settings, historyRoot, selectedResourceUrls, selectedResourceItems) {
   const debugEnabled = !!settings.debugMode;
   const debugEntries = [];
+  const debugRuntime = debugEnabled ? getDebugRuntimeInfo() : null;
   const fallbackUrl = settings.preferredHost
     ? `https://${settings.preferredHost}/ultra/courses/${encodeURIComponent(course.id)}/outline`
     : "";
@@ -1109,6 +1180,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
     if (debugEnabled) {
       const report = {
         generatedAt: new Date().toISOString(),
+        runtime: debugRuntime,
         courseId: course.id,
         courseName: course.name,
         crawledPages: data.crawledPages,
@@ -1269,6 +1341,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
     if (debugEnabled) {
       const report = {
         generatedAt: new Date().toISOString(),
+        runtime: debugRuntime,
         courseId: course.id,
         courseName: course.name,
         crawledPages: data.crawledPages,

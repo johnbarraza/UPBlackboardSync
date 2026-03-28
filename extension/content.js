@@ -1168,8 +1168,7 @@
     };
 
     let current = node;
-    let depth = 0;
-    while (current && depth < 20) {
+    while (current) {
       if (current.id && current.id.startsWith("folder-contents-")) {
         addById(`folder-title-${current.id.slice("folder-contents-".length)}`);
       }
@@ -1193,7 +1192,6 @@
       }
 
       current = current.parentElement;
-      depth += 1;
     }
 
     if (segments.length === 0) {
