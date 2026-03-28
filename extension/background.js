@@ -91,7 +91,7 @@ const DEFAULT_SETTINGS = {
   delayMs: 250,
   folderPrefix: "",
   zipBundling: true,
-  incrementalMode: true,
+  incrementalMode: false,
   debugMode: false,
   excludeVideo: false,
   maxFileSizeMb: 0,
@@ -515,6 +515,26 @@ function canonicalResourceUrl(rawUrl) {
   }
 }
 
+function isStaticFallbackCandidate(rawUrl) {
+  try {
+    const u = new URL(rawUrl);
+    const host = u.hostname.toLowerCase();
+    const path = u.pathname.toLowerCase();
+    if (path.endsWith("/favicon.ico")) {
+      return true;
+    }
+    if (/\.(css|js|map|ico)$/i.test(path)) {
+      return true;
+    }
+    if ((/blackboardcdn\.com$/i.test(host) || /(^|\.)bb\.com$/i.test(host)) && /\/images\//i.test(path)) {
+      return true;
+    }
+    return false;
+  } catch (_err) {
+    return false;
+  }
+}
+
 function buildFetchCandidates(rawUrl) {
   const source = normalizeUrl(rawUrl);
   if (!source) {
@@ -563,6 +583,9 @@ function extractDownloadCandidatesFromHtml(html, baseUrl) {
       return;
     }
     const bbNormalized = normalizeBbcswebdavUrl(normalized);
+    if (isStaticFallbackCandidate(bbNormalized)) {
+      return;
+    }
     if (!isLikelyBinaryUrl(bbNormalized)) {
       return;
     }
@@ -1087,6 +1110,12 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
 
 async function startDownloads(payload) {
   const settings = await getSettings();
+  if (payload && typeof payload.incrementalMode === "boolean") {
+    settings.incrementalMode = payload.incrementalMode;
+  }
+  if (payload && typeof payload.debugMode === "boolean") {
+    settings.debugMode = payload.debugMode;
+  }
   const tabId = Number(payload && payload.tabId);
   const courses = (payload && payload.courses) || [];
   const selectedByCourse = (payload && payload.selectedResourceUrlsByCourse) || {};

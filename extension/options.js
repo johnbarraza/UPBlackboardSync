@@ -70,7 +70,7 @@ const DEFAULT_SETTINGS = {
   delayMs: 250,
   folderPrefix: "",
   zipBundling: true,
-  incrementalMode: true,
+  incrementalMode: false,
   debugMode: false,
   excludeVideo: false,
   maxFileSizeMb: 0,

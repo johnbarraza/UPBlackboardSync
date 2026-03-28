@@ -556,7 +556,9 @@ async function downloadSelected() {
   setStatus(`Starting download for ${selectedCourses.length} course(s)...`);
   const payload = {
     tabId: activeTabId,
-    courses: selectedCourses
+    courses: selectedCourses,
+    incrementalMode: !!(settings && settings.incrementalMode),
+    debugMode: !!(settings && settings.debugMode)
   };
 
   if (detectedByCourse.size > 0) {
