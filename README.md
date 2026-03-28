@@ -6,19 +6,18 @@ Repositorio original: https://github.com/sanjacob/BlackboardSync
 Mantenimiento local para uso en Universidad del Pacifico (Peru).
 Licencia: GPL-2.0 (se mantiene la licencia del proyecto original).
 
+## Distribucion
+
+Este proyecto publica dos tipos de archivos:
+
+- Aplicacion de escritorio (desktop).
+- Extension de navegador para Chrome y Firefox.
+
 [![Build][build-shield]][actions]
 [![GitHub Downloads][downloads-shield]][releases]
 [![Latest Release Downloads][release-downloads-shield]][stable]
 [![Latest Release][latest-shield]][stable]
 [![GitHub Stars][stars-shield]][stars]
-
-## Badges
-
-- Build status del workflow principal.
-- Descargas acumuladas de todos los releases.
-- Descargas del ultimo release.
-- Tag del ultimo release publicado.
-- Stars del repositorio.
 
 [actions]: https://github.com/johnbarraza/UPBlackboardSync/actions
 [build-shield]: https://img.shields.io/github/actions/workflow/status/johnbarraza/UPBlackboardSync/build.yml?branch=main&label=build
