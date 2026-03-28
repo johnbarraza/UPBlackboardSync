@@ -71,6 +71,7 @@ const DEFAULT_SETTINGS = {
   folderPrefix: "",
   zipBundling: true,
   incrementalMode: true,
+  debugMode: false,
   excludeVideo: false,
   maxFileSizeMb: 0,
   maxPagesPerCourse: 60
@@ -106,6 +107,7 @@ function readForm() {
     folderPrefix: document.getElementById("folder-prefix").value || "",
     zipBundling: document.getElementById("zip-bundling").checked,
     incrementalMode: document.getElementById("incremental-mode").checked,
+    debugMode: document.getElementById("debug-mode").checked,
     excludeVideo: document.getElementById("exclude-video").checked,
     maxFileSizeMb: Number(document.getElementById("max-file-size").value || 0),
     maxPagesPerCourse: Number(document.getElementById("max-pages").value || 60)
@@ -131,6 +133,7 @@ function fillForm(settings) {
   document.getElementById("folder-prefix").value = settings.folderPrefix || "";
   document.getElementById("zip-bundling").checked = !!settings.zipBundling;
   document.getElementById("incremental-mode").checked = !!settings.incrementalMode;
+  document.getElementById("debug-mode").checked = !!settings.debugMode;
   document.getElementById("exclude-video").checked = !!settings.excludeVideo;
   document.getElementById("max-file-size").value = settings.maxFileSizeMb ?? 0;
   document.getElementById("max-pages").value = settings.maxPagesPerCourse ?? 60;

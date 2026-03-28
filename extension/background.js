@@ -92,6 +92,7 @@ const DEFAULT_SETTINGS = {
   folderPrefix: "",
   zipBundling: true,
   incrementalMode: true,
+  debugMode: false,
   excludeVideo: false,
   maxFileSizeMb: 0,
   maxPagesPerCourse: 60
@@ -357,15 +358,55 @@ function looksLikeHtml(bytes) {
   }
 }
 
+function looksLikePdf(bytes) {
+  if (!(bytes instanceof Uint8Array) || bytes.length < 5) {
+    return false;
+  }
+  return (
+    bytes[0] === 0x25 && // %
+    bytes[1] === 0x50 && // P
+    bytes[2] === 0x44 && // D
+    bytes[3] === 0x46 && // F
+    bytes[4] === 0x2d // -
+  );
+}
+
+function isHtmlPayload(bytes, meta) {
+  const contentType = String((meta && meta.contentType) || "").toLowerCase();
+  return contentType.includes("text/html") || looksLikeHtml(bytes);
+}
+
+function seemsPdfTarget(filename, url, meta) {
+  const lowerName = String(filename || "").toLowerCase();
+  const lowerUrl = String(url || "").toLowerCase();
+  const contentType = String((meta && meta.contentType) || "").toLowerCase();
+  return (
+    lowerName.endsWith(".pdf") ||
+    /\.pdf(?:$|[?#])/.test(lowerUrl) ||
+    contentType.includes("application/pdf")
+  );
+}
+
 function normalizeDownloadedFilename(filename, meta, bytes) {
   const lower = String(filename || "").toLowerCase();
-  const isHtmlType = (meta.contentType || "").toLowerCase().includes("text/html");
-  if (isHtmlType && looksLikeHtml(bytes)) {
+  if (isHtmlPayload(bytes, meta)) {
     if (!lower.endsWith(".html") && !lower.endsWith(".htm")) {
       return `${removeExtension(filename)}.html`;
     }
   }
   return filename;
+}
+
+function validateDownloadedPayload(filename, url, meta, bytes) {
+  if (isHtmlPayload(bytes, meta)) {
+    return { keep: false, reason: "html-response" };
+  }
+
+  if (seemsPdfTarget(filename, url, meta) && !looksLikePdf(bytes)) {
+    return { keep: false, reason: "invalid-pdf" };
+  }
+
+  return { keep: true };
 }
 
 function isVideoResource(url, contentType) {
@@ -595,6 +636,8 @@ async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
 }
 
 async function processCourse(tabId, course, settings, historyRoot, selectedResourceUrls) {
+  const debugEnabled = !!settings.debugMode;
+  const debugEntries = [];
   const fallbackUrl = settings.preferredHost
     ? `https://${settings.preferredHost}/ultra/courses/${encodeURIComponent(course.id)}/outline`
     : "";
@@ -650,15 +693,43 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       try {
         const fetched = await fetchResourceWithFallback(resource.url);
         const resolvedUrl = fetched.resolvedUrl || resource.url;
+        const contentType = fetched.meta.contentType || "";
+        const contentLength = fetched.meta.contentLength || fetched.bytes.length || 0;
         const verdict = applyResourceFilters(resolvedUrl, fetched.meta, settings);
         if (!verdict.keep) {
           skipped.push({ url: resource.url, reason: verdict.reason });
+          if (debugEnabled) {
+            debugEntries.push({
+              requestedUrl: resource.url,
+              resolvedUrl,
+              title: resource.title || "",
+              folder: resource.folder || "files",
+              sourcePage: resource.sourcePage || "",
+              contentType,
+              contentLength,
+              outcome: "skipped",
+              reason: verdict.reason
+            });
+          }
           continue;
         }
 
         const signature = makeSignature(resolvedUrl, fetched.meta);
         if (settings.incrementalMode && courseRoot[signature]) {
           skipped.push({ url: resource.url, reason: "incremental" });
+          if (debugEnabled) {
+            debugEntries.push({
+              requestedUrl: resource.url,
+              resolvedUrl,
+              title: resource.title || "",
+              folder: resource.folder || "files",
+              sourcePage: resource.sourcePage || "",
+              contentType,
+              contentLength,
+              outcome: "skipped",
+              reason: "incremental"
+            });
+          }
           continue;
         }
 
@@ -667,13 +738,62 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
           fetched.meta,
           fetched.bytes
         );
+        const payloadVerdict = validateDownloadedPayload(
+          filename,
+          resolvedUrl,
+          fetched.meta,
+          fetched.bytes
+        );
+        if (!payloadVerdict.keep) {
+          skipped.push({ url: resource.url, reason: payloadVerdict.reason });
+          if (debugEnabled) {
+            debugEntries.push({
+              requestedUrl: resource.url,
+              resolvedUrl,
+              title: resource.title || "",
+              folder: resource.folder || "files",
+              sourcePage: resource.sourcePage || "",
+              contentType,
+              contentLength,
+              filename,
+              outcome: "skipped",
+              reason: payloadVerdict.reason
+            });
+          }
+          continue;
+        }
         const folder = sanitizeName(resource.folder || "files");
         const zipPath = `${courseFolder}/${folder}/${filename}`;
         filesForZip.push({ name: zipPath, bytes: fetched.bytes });
         courseRoot[signature] = true;
         downloaded.push(resource.url);
+        if (debugEnabled) {
+          debugEntries.push({
+            requestedUrl: resource.url,
+            resolvedUrl,
+            title: resource.title || "",
+            folder: resource.folder || "files",
+            sourcePage: resource.sourcePage || "",
+            contentType,
+            contentLength,
+            filename,
+            outcome: "downloaded"
+          });
+        }
       } catch (_err) {
         skipped.push({ url: resource.url, reason: "fetch-failed" });
+        if (debugEnabled) {
+          debugEntries.push({
+            requestedUrl: resource.url,
+            resolvedUrl: "",
+            title: resource.title || "",
+            folder: resource.folder || "files",
+            sourcePage: resource.sourcePage || "",
+            outcome: "skipped",
+            reason: "fetch-failed",
+            error: String(_err)
+          });
+        }
       }
     }
 
@@ -681,6 +801,23 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       filesForZip.push({
         name: `${courseFolder}/grades.csv`,
         bytes: toUtf8Bytes(buildGradesCsv(gradeRows))
+      });
+    }
+
+    if (debugEnabled) {
+      const report = {
+        generatedAt: new Date().toISOString(),
+        courseId: course.id,
+        courseName: course.name,
+        crawledPages: data.crawledPages,
+        foundResources: resources.length,
+        downloaded: downloaded.length,
+        skipped: skipped.length,
+        entries: debugEntries
+      };
+      filesForZip.push({
+        name: `${courseFolder}/debug/debug_report.json`,
+        bytes: toUtf8Bytes(JSON.stringify(report, null, 2))
       });
     }
 
@@ -703,24 +840,75 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
         const fetched = await fetchResourceWithFallback(resource.url);
         const resolvedUrl = fetched.resolvedUrl || resource.url;
         const meta = fetched.meta;
+        const contentType = meta.contentType || "";
+        const contentLength = meta.contentLength || fetched.bytes.length || 0;
         const verdict = applyResourceFilters(resolvedUrl, meta, settings);
         if (!verdict.keep) {
           skipped.push({ url: resource.url, reason: verdict.reason });
+          if (debugEnabled) {
+            debugEntries.push({
+              requestedUrl: resource.url,
+              resolvedUrl,
+              title: resource.title || "",
+              folder: resource.folder || "files",
+              sourcePage: resource.sourcePage || "",
+              contentType,
+              contentLength,
+              outcome: "skipped",
+              reason: verdict.reason
+            });
+          }
           continue;
         }
 
         const signature = makeSignature(resolvedUrl, meta);
         if (settings.incrementalMode && courseRoot[signature]) {
           skipped.push({ url: resource.url, reason: "incremental" });
+          if (debugEnabled) {
+            debugEntries.push({
+              requestedUrl: resource.url,
+              resolvedUrl,
+              title: resource.title || "",
+              folder: resource.folder || "files",
+              sourcePage: resource.sourcePage || "",
+              contentType,
+              contentLength,
+              outcome: "skipped",
+              reason: "incremental"
+            });
+          }
           continue;
         }
-        courseRoot[signature] = true;
 
         const filename = normalizeDownloadedFilename(
           ensureFileName(resource.title, resolvedUrl, meta.contentType || ""),
           meta,
           fetched.bytes
         );
+        const payloadVerdict = validateDownloadedPayload(
+          filename,
+          resolvedUrl,
+          meta,
+          fetched.bytes
+        );
+        if (!payloadVerdict.keep) {
+          skipped.push({ url: resource.url, reason: payloadVerdict.reason });
+          if (debugEnabled) {
+            debugEntries.push({
+              requestedUrl: resource.url,
+              resolvedUrl,
+              title: resource.title || "",
+              folder: resource.folder || "files",
+              sourcePage: resource.sourcePage || "",
+              contentType,
+              contentLength,
+              filename,
+              outcome: "skipped",
+              reason: payloadVerdict.reason
+            });
+          }
+          continue;
+        }
         const folder = sanitizeName(resource.folder || "files");
         await downloadDataFile(
           `${courseFolder}/${folder}/${filename}`,
@@ -728,12 +916,38 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
           fetched.bytes,
           settings.conflictHandling
         );
+        courseRoot[signature] = true;
         downloaded.push(resource.url);
+        if (debugEnabled) {
+          debugEntries.push({
+            requestedUrl: resource.url,
+            resolvedUrl,
+            title: resource.title || "",
+            folder: resource.folder || "files",
+            sourcePage: resource.sourcePage || "",
+            contentType,
+            contentLength,
+            filename,
+            outcome: "downloaded"
+          });
+        }
         if (settings.delayMs > 0) {
           await sleep(settings.delayMs);
         }
       } catch (_err) {
         skipped.push({ url: resource.url, reason: "download-failed" });
+        if (debugEnabled) {
+          debugEntries.push({
+            requestedUrl: resource.url,
+            resolvedUrl: "",
+            title: resource.title || "",
+            folder: resource.folder || "files",
+            sourcePage: resource.sourcePage || "",
+            outcome: "skipped",
+            reason: "download-failed",
+            error: String(_err)
+          });
+        }
       }
     }
 
@@ -742,6 +956,25 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
         `${courseFolder}/grades.csv`,
         "text/csv",
         buildGradesCsv(gradeRows),
+        settings.conflictHandling
+      );
+    }
+
+    if (debugEnabled) {
+      const report = {
+        generatedAt: new Date().toISOString(),
+        courseId: course.id,
+        courseName: course.name,
+        crawledPages: data.crawledPages,
+        foundResources: resources.length,
+        downloaded: downloaded.length,
+        skipped: skipped.length,
+        entries: debugEntries
+      };
+      await downloadDataFile(
+        `${courseFolder}/debug/debug_report.json`,
+        "application/json",
+        JSON.stringify(report, null, 2),
         settings.conflictHandling
       );
     }
@@ -756,7 +989,13 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
     crawledPages: data.crawledPages,
     foundResources: resources.length,
     downloaded: downloaded.length,
-    skipped: skipped.length
+    skipped: skipped.length,
+    skippedByReason: skipped.reduce((acc, item) => {
+      const key = String((item && item.reason) || "unknown");
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {}),
+    debugEntries: debugEnabled ? debugEntries.length : 0
   };
 }
 

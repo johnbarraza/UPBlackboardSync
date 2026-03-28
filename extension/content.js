@@ -117,6 +117,16 @@
       .trim();
   }
 
+  function extractYearToken(value) {
+    const normalized = normalizeText(value).toUpperCase();
+    let match = normalized.match(/\b(19\d{2}|20\d{2})\b/);
+    if (!match) {
+      // Accept packed formats such as PRE2026_IPER...
+      match = normalized.match(/(?:^|[^0-9])(19\d{2}|20\d{2})(?:[^0-9]|$)/);
+    }
+    return match && match[1] ? match[1] : "";
+  }
+
   function rankedTerm(term) {
     const raw = cleanTermLabel(term);
     if (!raw || /^no term$/i.test(raw)) {
@@ -124,12 +134,12 @@
     }
 
     const normalized = normalizeText(raw).toUpperCase();
-    const yearMatch = normalized.match(/\b(19\d{2}|20\d{2})\b/);
-    if (!yearMatch) {
+    const yearToken = extractYearToken(normalized);
+    if (!yearToken) {
       return null;
     }
 
-    const year = Number(yearMatch[1]);
+    const year = Number(yearToken);
     const full = ` ${normalized} `;
     let period = 0;
 
@@ -149,7 +159,8 @@
       } else if (/\b(WINTER|INVIERNO)\b/.test(full)) {
         period = 0;
       } else {
-        const afterYear = normalized.slice(normalized.indexOf(yearMatch[1]) + 4);
+        const yearIndex = normalized.indexOf(yearToken);
+        const afterYear = yearIndex >= 0 ? normalized.slice(yearIndex + 4) : "";
         const numberMatch = afterYear.match(/[\/\-_ ](0?[1-9]|1[0-2])(?:\b|[\/\-_ ])/);
         if (numberMatch) {
           period = Number(numberMatch[1]);
@@ -179,7 +190,8 @@
     const patterns = [
       /((?:19|20)\d{2}\s*[-/_ ]\s*(?:0?[1-9]|1[0-2]|I{1,3}|IV|V|A|B|C|D|SPRING|SUMMER|FALL|AUTUMN|WINTER|PRIMAVERA|VERANO|OTONO|INVIERNO))/ig,
       /((?:SEMESTER|SEMESTRE|TERM|CICLO|PERIODO|QUARTER|TRIMESTRE)\s*[A-Z0-9IVX]+)/ig,
-      /((?:19|20)\d{2}\s*(?:SPRING|SUMMER|FALL|AUTUMN|WINTER|PRIMAVERA|VERANO|OTONO|INVIERNO))/ig
+      /((?:19|20)\d{2}\s*(?:SPRING|SUMMER|FALL|AUTUMN|WINTER|PRIMAVERA|VERANO|OTONO|INVIERNO))/ig,
+      /((?:PRE|POST|CICLO|TERM|SEMESTRE)?\s*(?:19|20)\d{2}(?:[_\- ](?:0?[1-9]|1[0-2]|I{1,3}|IV|V|PRE|POST))?)/ig
     ];
     for (const pattern of patterns) {
       for (const match of clean.matchAll(pattern)) {
@@ -198,6 +210,11 @@
         continue;
       }
       return label;
+    }
+
+    const yearToken = extractYearToken(clean);
+    if (yearToken) {
+      return yearToken;
     }
 
     return "No term";
@@ -366,11 +383,12 @@
   }
 
   function getCurrentCourseTitle(courseId) {
+    let courseCodeLabel = "";
     const courseIdNode = document.getElementById(`course-id-${courseId}`);
     if (courseIdNode && courseIdNode.textContent) {
       const displayIdName = cleanCourseName(courseIdNode.textContent);
       if (!isWeakCourseName(displayIdName, courseId)) {
-        return displayIdName;
+        courseCodeLabel = displayIdName;
       }
     }
 
@@ -394,6 +412,9 @@
     }
 
     const selectors = [
+      "course-banner h1",
+      "course-banner [class*='courseTitle']",
+      "[class*='titleContainer'] h1",
       "h1[class*='courseTitle']",
       "div[class*='courseTitle']",
       "[data-qa='course-title']",
@@ -419,6 +440,10 @@
     const title = cleanCourseName(document.title);
     if (title && !isWeakCourseName(title, courseId)) {
       return title;
+    }
+
+    if (courseCodeLabel) {
+      return courseCodeLabel;
     }
 
     return courseId;
@@ -736,6 +761,48 @@
     ];
   }
 
+  function collectAnnouncementItems(doc) {
+    const rows = Array.from(doc.querySelectorAll("tr.announcement-item-row"));
+    const items = [];
+
+    for (const row of rows) {
+      const anchor =
+        row.querySelector(".announcement-title-detail a") ||
+        row.querySelector("a[id^='list-item-title-']");
+      const title = sanitizeName((anchor && anchor.textContent) || "Announcement");
+      if (!title) {
+        continue;
+      }
+
+      const bodyNode = row.querySelector(".list-item-body");
+      const body = fixMojibake((bodyNode && bodyNode.textContent) || "").trim();
+      const posted = fixMojibake(
+        ((row.querySelector(".list-item-date-sent") && row.querySelector(".list-item-date-sent").textContent) ||
+          "")
+      ).trim();
+      const rowId = ((anchor && anchor.id) || row.getAttribute("id") || "").trim();
+      const stableId = rowId || `${title}::${posted}`;
+
+      const lines = [`Title: ${title}`];
+      if (posted) {
+        lines.push(`Posted: ${posted}`);
+      }
+      if (body) {
+        lines.push("");
+        lines.push(body);
+      }
+
+      items.push({
+        id: stableId,
+        title,
+        posted,
+        body: `${lines.join("\n").trim()}\n`
+      });
+    }
+
+    return items;
+  }
+
   function inferUltraResourceUrlFromNode(node, pageUrl, courseId) {
     const contentNode = node.closest("[data-content-id]");
     const contentId = contentNode && contentNode.getAttribute("data-content-id");
@@ -1004,7 +1071,8 @@
     seenResources,
     resources,
     textFiles,
-    gradeRows
+    gradeRows,
+    seenAnnouncementItems
   ) {
     const isErrorPage = isBlackboardErrorPage(doc, html, pageUrl);
     const pageTitle = sanitizeName(
@@ -1064,6 +1132,21 @@
     );
 
     if (hasAnnouncementSignal) {
+      if (settings.contentTypes.text && settings.contentTypes.announcements !== false) {
+        const items = collectAnnouncementItems(doc);
+        for (const item of items) {
+          const dedupeKey = `${course.id}::${item.id}`;
+          if (seenAnnouncementItems.has(dedupeKey)) {
+            continue;
+          }
+          seenAnnouncementItems.add(dedupeKey);
+          const postedPrefix = item.posted ? `${sanitizeName(item.posted)} - ` : "";
+          textFiles.push({
+            path: `announcements/${postedPrefix}${item.title}.txt`,
+            body: item.body
+          });
+        }
+      }
       for (const seed of buildCourseSeedUrls(course.id, pageUrl)) {
         addUrlToQueue(queue, seenPages, seed);
       }
@@ -1075,6 +1158,7 @@
     const queue = [];
     const seenPages = new Set();
     const seenResources = new Set();
+    const seenAnnouncementItems = new Set();
     const resources = [];
     const textFiles = [];
     const gradeRows = [];
@@ -1103,7 +1187,8 @@
         seenResources,
         resources,
         textFiles,
-        gradeRows
+        gradeRows,
+        seenAnnouncementItems
       );
 
       for (const seed of buildCourseSeedUrls(course.id, liveUrl)) {
@@ -1137,7 +1222,8 @@
         seenResources,
         resources,
         textFiles,
-        gradeRows
+        gradeRows,
+        seenAnnouncementItems
       );
     }
 

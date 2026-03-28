@@ -114,6 +114,7 @@ function summarizeSettings(s) {
     `Preset: ${s.exportPreset}`,
     `ZIP: ${s.zipBundling ? "on" : "off"}`,
     `Incremental: ${s.incrementalMode ? "on" : "off"}`,
+    `Debug: ${s.debugMode ? "on" : "off"}`,
     `Delay: ${s.delayMs} ms`,
     `Conflict: ${s.conflictHandling}`,
     `Max size: ${s.maxFileSizeMb || "none"} MB`,
@@ -439,6 +440,7 @@ async function loadSettings() {
   }
   settings = resp.settings;
   document.getElementById("settings-summary").textContent = summarizeSettings(settings);
+  document.getElementById("debug-mode-toggle").checked = !!settings.debugMode;
 }
 
 async function init() {
@@ -556,8 +558,12 @@ async function downloadSelected() {
 
   const lines = ["Done:"];
   for (const s of resp.result.summaries || []) {
+    const reasonEntries = Object.entries(s.skippedByReason || {});
+    const reasonSummary = reasonEntries.length
+      ? ` | reasons=${reasonEntries.map(([k, v]) => `${k}:${v}`).join(", ")}`
+      : "";
     lines.push(
-      `- ${s.courseName}: pages=${s.crawledPages}, resources=${s.foundResources}, downloaded=${s.downloaded}, skipped=${s.skipped}`
+      `- ${s.courseName}: pages=${s.crawledPages}, resources=${s.foundResources}, downloaded=${s.downloaded}, skipped=${s.skipped}${reasonSummary}`
     );
   }
   setStatus(lines.join("\n"));
@@ -629,6 +635,35 @@ document.getElementById("material-list").addEventListener("change", (event) => {
     selectedMaterialKeys.delete(key);
   }
   renderMaterialList();
+});
+
+document.getElementById("debug-mode-toggle").addEventListener("change", async (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) {
+    return;
+  }
+  const wanted = !!target.checked;
+  const previous = !!(settings && settings.debugMode);
+  if (wanted === previous) {
+    return;
+  }
+
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "save-settings",
+      settings: { ...(settings || {}), debugMode: wanted }
+    });
+    if (!resp || !resp.ok) {
+      throw new Error(resp && resp.error ? resp.error : "Could not save settings");
+    }
+    settings = resp.settings;
+    document.getElementById("settings-summary").textContent = summarizeSettings(settings);
+    target.checked = !!settings.debugMode;
+    setStatus(`Debug mode ${settings.debugMode ? "enabled" : "disabled"}.`);
+  } catch (err) {
+    target.checked = previous;
+    setStatus(`Error: ${String(err)}`);
+  }
 });
 
 init().catch((err) => setStatus(`Init error: ${String(err)}`));
