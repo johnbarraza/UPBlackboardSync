@@ -492,6 +492,29 @@ function normalizeBbcswebdavUrl(rawUrl) {
   }
 }
 
+function canonicalResourceUrl(rawUrl) {
+  const normalized = normalizeBbcswebdavUrl(rawUrl);
+  if (!normalized) {
+    return "";
+  }
+  try {
+    const u = new URL(normalized);
+    const sortedEntries = Array.from(u.searchParams.entries()).sort(([ak, av], [bk, bv]) => {
+      if (ak === bk) {
+        return av.localeCompare(bv);
+      }
+      return ak.localeCompare(bk);
+    });
+    u.search = "";
+    for (const [k, v] of sortedEntries) {
+      u.searchParams.append(k, v);
+    }
+    return u.toString();
+  } catch (_err) {
+    return normalized;
+  }
+}
+
 function buildFetchCandidates(rawUrl) {
   const source = normalizeUrl(rawUrl);
   if (!source) {
@@ -658,7 +681,7 @@ function applyResourceFilters(url, meta, settings) {
 function dedupeResources(resources) {
   const map = new Map();
   for (const item of resources || []) {
-    const url = normalizeUrl(item.url);
+    const url = canonicalResourceUrl(item.url);
     if (!url) {
       continue;
     }
@@ -680,7 +703,7 @@ async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
   });
 }
 
-async function processCourse(tabId, course, settings, historyRoot, selectedResourceUrls) {
+async function processCourse(tabId, course, settings, historyRoot, selectedResourceUrls, selectedResourceItems) {
   const debugEnabled = !!settings.debugMode;
   const debugEntries = [];
   const fallbackUrl = settings.preferredHost
@@ -692,25 +715,43 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
     url: resolvedUrl || course.url
   };
 
-  const crawlResp = await sendToTab(tabId, {
-    type: "crawl-course",
-    course: resolvedCourse,
-    settings
-  });
+  let data;
+  if (Array.isArray(selectedResourceItems) && selectedResourceItems.length > 0) {
+    data = {
+      course: resolvedCourse,
+      crawledPages: 0,
+      resources: selectedResourceItems
+        .map((item) => ({
+          url: canonicalResourceUrl(item.url),
+          title: sanitizeName(item.title || ""),
+          folder: sanitizeName(item.folder || "files"),
+          sourcePage: normalizeUrl(item.sourcePage || "") || resolvedCourse.url || ""
+        }))
+        .filter((item) => !!item.url),
+      textFiles: [],
+      gradeRows: []
+    };
+  } else {
+    const crawlResp = await sendToTab(tabId, {
+      type: "crawl-course",
+      course: resolvedCourse,
+      settings
+    });
 
-  if (!crawlResp || !crawlResp.ok) {
-    throw new Error(crawlResp && crawlResp.error ? crawlResp.error : "Could not crawl course");
+    if (!crawlResp || !crawlResp.ok) {
+      throw new Error(crawlResp && crawlResp.error ? crawlResp.error : "Could not crawl course");
+    }
+    data = crawlResp.data;
   }
 
-  const data = crawlResp.data;
   let resources = dedupeResources(data.resources);
   if (Array.isArray(selectedResourceUrls)) {
     const allowed = new Set(
       selectedResourceUrls
-        .map((url) => normalizeUrl(url))
+        .map((url) => canonicalResourceUrl(url))
         .filter(Boolean)
     );
-    resources = resources.filter((item) => allowed.has(normalizeUrl(item.url)));
+    resources = resources.filter((item) => allowed.has(canonicalResourceUrl(item.url)));
   }
   const textFiles = data.textFiles || [];
   const gradeRows = data.gradeRows || [];
@@ -1049,6 +1090,7 @@ async function startDownloads(payload) {
   const tabId = Number(payload && payload.tabId);
   const courses = (payload && payload.courses) || [];
   const selectedByCourse = (payload && payload.selectedResourceUrlsByCourse) || {};
+  const selectedItemsByCourse = (payload && payload.selectedResourcesByCourse) || {};
 
   if (!tabId || courses.length === 0) {
     throw new Error("No courses selected or tab unavailable.");
@@ -1061,7 +1103,17 @@ async function startDownloads(payload) {
     const selectedResourceUrls = Array.isArray(selectedByCourse[course.id])
       ? selectedByCourse[course.id]
       : null;
-    const summary = await processCourse(tabId, course, settings, history, selectedResourceUrls);
+    const selectedResourceItems = Array.isArray(selectedItemsByCourse[course.id])
+      ? selectedItemsByCourse[course.id]
+      : null;
+    const summary = await processCourse(
+      tabId,
+      course,
+      settings,
+      history,
+      selectedResourceUrls,
+      selectedResourceItems
+    );
     summaries.push(summary);
   }
 

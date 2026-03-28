@@ -568,19 +568,28 @@ async function downloadSelected() {
     }
 
     const selectedResourceUrlsByCourse = {};
+    const selectedResourcesByCourse = {};
     let totalSelected = 0;
 
     for (const course of selectedCourses) {
       const data = detectedByCourse.get(course.id) || { items: [] };
       const urls = [];
+      const selectedItems = [];
       for (const item of data.items || []) {
         const key = materialKey(course.id, item.url);
         if (selectedMaterialKeys.has(key)) {
           urls.push(item.url);
+          selectedItems.push({
+            url: item.url,
+            title: item.title || "resource",
+            folder: item.folder || "files",
+            sourcePage: item.sourcePage || ""
+          });
         }
       }
       if (urls.length > 0) {
         selectedResourceUrlsByCourse[course.id] = urls;
+        selectedResourcesByCourse[course.id] = selectedItems;
         totalSelected += urls.length;
       }
     }
@@ -591,6 +600,7 @@ async function downloadSelected() {
     }
 
     payload.selectedResourceUrlsByCourse = selectedResourceUrlsByCourse;
+    payload.selectedResourcesByCourse = selectedResourcesByCourse;
   }
 
   const resp = await chrome.runtime.sendMessage({
