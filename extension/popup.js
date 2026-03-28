@@ -274,6 +274,26 @@ function setAllDetectedMaterials(checked) {
   renderMaterialList();
 }
 
+function setFolderMaterials(courseId, folder, checked) {
+  const data = detectedByCourse.get(courseId);
+  if (!data) {
+    return;
+  }
+  const folderName = String(folder || "");
+  for (const item of data.items || []) {
+    if (String(item.folder || "") !== folderName) {
+      continue;
+    }
+    const key = materialKey(courseId, item.url);
+    if (checked) {
+      selectedMaterialKeys.add(key);
+    } else {
+      selectedMaterialKeys.delete(key);
+    }
+  }
+  renderMaterialList();
+}
+
 function renderMaterialList() {
   const summary = document.getElementById("material-summary");
   const container = document.getElementById("material-list");
@@ -317,10 +337,37 @@ function renderMaterialList() {
     }
 
     for (const [folder, items] of grouped.entries()) {
+      const folderHeader = document.createElement("div");
+      folderHeader.className = "material-folder-header";
+
       const folderTitle = document.createElement("div");
       folderTitle.className = "material-folder-title";
       folderTitle.textContent = folder;
-      section.appendChild(folderTitle);
+      folderHeader.appendChild(folderTitle);
+
+      const actions = document.createElement("div");
+      actions.className = "material-folder-actions";
+
+      const selectBtn = document.createElement("button");
+      selectBtn.type = "button";
+      selectBtn.className = "tiny-btn";
+      selectBtn.textContent = "All";
+      selectBtn.dataset.folderAction = "select";
+      selectBtn.dataset.courseId = courseId;
+      selectBtn.dataset.folder = folder;
+
+      const clearBtn = document.createElement("button");
+      clearBtn.type = "button";
+      clearBtn.className = "tiny-btn";
+      clearBtn.textContent = "None";
+      clearBtn.dataset.folderAction = "clear";
+      clearBtn.dataset.courseId = courseId;
+      clearBtn.dataset.folder = folder;
+
+      actions.appendChild(selectBtn);
+      actions.appendChild(clearBtn);
+      folderHeader.appendChild(actions);
+      section.appendChild(folderHeader);
 
       for (const item of items) {
         const key = materialKey(courseId, item.url);
@@ -636,6 +683,23 @@ document.getElementById("material-list").addEventListener("change", (event) => {
     selectedMaterialKeys.delete(key);
   }
   renderMaterialList();
+});
+
+document.getElementById("material-list").addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) {
+    return;
+  }
+  const action = target.dataset.folderAction || "";
+  if (!action) {
+    return;
+  }
+  const courseId = target.dataset.courseId || "";
+  const folder = target.dataset.folder || "";
+  if (!courseId) {
+    return;
+  }
+  setFolderMaterials(courseId, folder, action === "select");
 });
 
 document.getElementById("debug-mode-toggle").addEventListener("change", async (event) => {

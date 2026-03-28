@@ -991,7 +991,13 @@
     }
 
     if (segments.length === 0) {
-      return pageType;
+      return pageType === "modules" ? "files" : pageType;
+    }
+
+    // In modules view, keep the Blackboard folder/module names directly
+    // instead of adding an artificial "modules/" prefix.
+    if (pageType === "modules") {
+      return segments.join("/");
     }
     return `${pageType}/${segments.join("/")}`;
   }
