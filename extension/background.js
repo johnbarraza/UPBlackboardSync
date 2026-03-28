@@ -102,9 +102,29 @@ const FILE_EXT_RE = /\.[A-Za-z0-9]{2,8}$/;
 const BLACKBOARD_FILE_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/file\/[^/?#]+(?:\/download)?/i;
 const BLACKBOARD_DOCUMENT_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/edit\/document\/[^/?#]+(?:\/download)?/i;
 const DOWNLOAD_HINT_RE = /(bbcswebdav|xythos-download|\/download\b|[?&]download=)/i;
+const MOJIBAKE_RE = /(?:\u00C3|\u00C2|\u00E2|\uFFFD)/;
+
+function fixMojibake(input) {
+  const raw = String(input || "");
+  if (!MOJIBAKE_RE.test(raw)) {
+    return raw;
+  }
+  try {
+    const bytes = new Uint8Array(Array.from(raw, (ch) => ch.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    const badRaw = (raw.match(/[\u00C2\u00C3\u00E2\uFFFD]/g) || []).length;
+    const badDecoded = (decoded.match(/[\u00C2\u00C3\u00E2\uFFFD]/g) || []).length;
+    if (badDecoded < badRaw) {
+      return decoded;
+    }
+  } catch (_err) {
+    // keep original text
+  }
+  return raw;
+}
 
 function sanitizeName(input) {
-  return String(input || "")
+  return fixMojibake(String(input || ""))
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
     .replace(/\s+/g, " ")
     .trim()

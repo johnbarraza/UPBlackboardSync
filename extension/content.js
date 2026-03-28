@@ -2,9 +2,35 @@
   const FILE_EXT_RE = /\.(pdf|docx?|pptx?|xlsx?|zip|rar|txt|csv|rtf|odt|ods|odp|png|jpe?g|gif|svg|webp|mp4|mov|avi|mkv|webm|wmv|flv|m4v)$/i;
   const BLACKBOARD_FILE_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/file\/[^/?#]+/i;
   const BLACKBOARD_DOCUMENT_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/edit\/document\/[^/?#]+/i;
+  const MOJIBAKE_RE = /(?:\u00C3|\u00C2|\u00E2|\uFFFD)/;
+  const ERROR_PAGE_HINTS = [
+    "request[/announcement]",
+    "does not contain handler parameter named 'method'",
+    "whitespace in the label text",
+    "for reference, the error id is"
+  ];
+
+  function fixMojibake(input) {
+    const raw = String(input || "");
+    if (!MOJIBAKE_RE.test(raw)) {
+      return raw;
+    }
+    try {
+      const bytes = new Uint8Array(Array.from(raw, (ch) => ch.charCodeAt(0) & 0xff));
+      const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+      const badRaw = (raw.match(/[\u00C2\u00C3\u00E2\uFFFD]/g) || []).length;
+      const badDecoded = (decoded.match(/[\u00C2\u00C3\u00E2\uFFFD]/g) || []).length;
+      if (badDecoded < badRaw) {
+        return decoded;
+      }
+    } catch (_err) {
+      // keep original text
+    }
+    return raw;
+  }
 
   function sanitizeName(input) {
-    return String(input || "")
+    return fixMojibake(String(input || ""))
       .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
       .replace(/\s+/g, " ")
       .trim()
@@ -655,8 +681,7 @@
     const encoded = encodeURIComponent(courseId);
     return [
       `${origin}/ultra/courses/${encoded}/outline`,
-      `${origin}/ultra/courses/${encoded}/announcements`,
-      `${origin}/webapps/blackboard/execute/announcement?course_id=${encoded}`
+      `${origin}/ultra/courses/${encoded}/announcements`
     ];
   }
 
@@ -697,11 +722,44 @@
   function collectLinksFromPage(doc) {
     return [
       ...Array.from(doc.querySelectorAll("a[href]")),
+      ...Array.from(doc.querySelectorAll("button[data-analytics-id*='course.content.navigation.item.content-link']")),
       ...Array.from(doc.querySelectorAll("iframe[src]")),
       ...Array.from(doc.querySelectorAll("img[src]")),
       ...Array.from(doc.querySelectorAll("source[src]")),
       ...Array.from(doc.querySelectorAll("[aria-controls^='file-preview-']"))
     ];
+  }
+
+  function inferUltraResourceUrlFromNode(node, pageUrl, courseId) {
+    const contentNode = node.closest("[data-content-id]");
+    const contentId = contentNode && contentNode.getAttribute("data-content-id");
+    if (!contentId || !courseId) {
+      return "";
+    }
+
+    let origin = location.origin;
+    try {
+      origin = new URL(pageUrl || location.href).origin;
+    } catch (_err) {
+      // keep location origin
+    }
+
+    const iconLabel = (
+      (contentNode.querySelector("svg[aria-label]") &&
+        contentNode.querySelector("svg[aria-label]").getAttribute("aria-label")) ||
+      ""
+    ).toLowerCase();
+
+    const encodedCourse = encodeURIComponent(courseId);
+    if (iconLabel.includes("pdf") || iconLabel.includes("file") || iconLabel.includes("archivo")) {
+      return `${origin}/ultra/courses/${encodedCourse}/outline/file/${encodeURIComponent(contentId)}`;
+    }
+
+    if (iconLabel.includes("text document") || iconLabel.includes("document") || iconLabel.includes("documento")) {
+      return `${origin}/ultra/courses/${encodedCourse}/outline/edit/document/${encodeURIComponent(contentId)}?courseId=${encodeURIComponent(courseId)}&view=content&state=view`;
+    }
+
+    return "";
   }
 
   function extractResourceUrl(node, pageUrl) {
@@ -734,6 +792,80 @@
     return label || filenameFromUrl(absoluteUrl);
   }
 
+  function addUniquePathSegment(segments, seen, value) {
+    const label = sanitizeName(value);
+    if (!label) {
+      return;
+    }
+    const key = label.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    segments.unshift(label);
+  }
+
+  function extractFolderPath(node, doc, pageType) {
+    const segments = [];
+    const seen = new Set();
+
+    const addById = (id) => {
+      if (!id) {
+        return;
+      }
+      const titleNode = doc.getElementById(id);
+      if (!titleNode) {
+        return;
+      }
+      addUniquePathSegment(
+        segments,
+        seen,
+        titleNode.textContent || titleNode.getAttribute("title") || ""
+      );
+    };
+
+    let current = node;
+    let depth = 0;
+    while (current && depth < 20) {
+      if (current.id && current.id.startsWith("folder-contents-")) {
+        addById(`folder-title-${current.id.slice("folder-contents-".length)}`);
+      }
+      if (current.id && current.id.startsWith("learning-module-contents-")) {
+        addById(`learning-module-title-${current.id.slice("learning-module-contents-".length)}`);
+      }
+
+      const labelledBy = current.getAttribute("aria-labelledby") || "";
+      for (const id of labelledBy.split(/\s+/).filter(Boolean)) {
+        if (id.startsWith("folder-title-") || id.startsWith("learning-module-title-")) {
+          addById(id);
+        }
+      }
+
+      const controls = current.getAttribute("aria-controls") || "";
+      if (controls.startsWith("folder-contents-")) {
+        addById(`folder-title-${controls.slice("folder-contents-".length)}`);
+      }
+      if (controls.startsWith("learning-module-contents-")) {
+        addById(`learning-module-title-${controls.slice("learning-module-contents-".length)}`);
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    if (segments.length === 0) {
+      return pageType;
+    }
+    return `${pageType}/${segments.join("/")}`;
+  }
+
+  function isBlackboardErrorPage(doc, html, pageUrl) {
+    const title = (doc.querySelector("title") && doc.querySelector("title").textContent) || "";
+    const bodyText = (doc.body && doc.body.textContent) || String(html || "");
+    const sample = `${title}\n${bodyText}\n${pageUrl}`.toLowerCase();
+    return ERROR_PAGE_HINTS.some((hint) => sample.includes(hint));
+  }
+
   function parsePageContent(
     doc,
     pageUrl,
@@ -747,13 +879,14 @@
     textFiles,
     gradeRows
   ) {
+    const isErrorPage = isBlackboardErrorPage(doc, html, pageUrl);
     const pageTitle = sanitizeName(
       (doc.querySelector("title") && doc.querySelector("title").textContent) ||
       pageUrl
     );
     const pageType = classifyPage(pageUrl);
 
-    if (settings.contentTypes.text && settings.contentTypes[pageType] !== false) {
+    if (!isErrorPage && settings.contentTypes.text && settings.contentTypes[pageType] !== false) {
       textFiles.push({
         path: `${pageType}/${pageTitle}.html`,
         body: html
@@ -765,7 +898,9 @@
     }
 
     for (const node of collectLinksFromPage(doc)) {
-      const absolute = extractResourceUrl(node, pageUrl);
+      const absolute =
+        extractResourceUrl(node, pageUrl) ||
+        inferUltraResourceUrlFromNode(node, pageUrl, course.id);
       if (!absolute) {
         continue;
       }
@@ -775,10 +910,11 @@
       if (isLikelyDownloadable(absolute)) {
         const key = `${absolute}::${label}`;
         if (!seenResources.has(key)) {
+          const folderPath = extractFolderPath(node, doc, pageType);
           resources.push({
             url: absolute,
             title: label,
-            folder: pageType,
+            folder: folderPath,
             sourcePage: pageUrl
           });
           seenResources.add(key);
@@ -790,11 +926,12 @@
       }
     }
 
-    const hasAnnouncementSignal =
+    const hasAnnouncementSignal = !isErrorPage && (
       pageType === "announcements" ||
       !!doc.querySelector("span[data-title='Announcements']") ||
       !!doc.querySelector("caption#announcement-table-caption") ||
-      !!doc.querySelector("table.table-content.sortable-table");
+      !!doc.querySelector("table.table-content.sortable-table")
+    );
 
     if (hasAnnouncementSignal) {
       for (const seed of buildCourseSeedUrls(course.id, pageUrl)) {
@@ -885,9 +1022,11 @@
   function collectCurrentPageResources() {
     const links = [];
     const seen = new Set();
-    for (const node of document.querySelectorAll("a[href],iframe[src],img[src],source[src]")) {
+    for (const node of document.querySelectorAll("a[href],button[data-analytics-id*='course.content.navigation.item.content-link'],iframe[src],img[src],source[src]")) {
       const raw = node.getAttribute("href") || node.getAttribute("src");
-      const absolute = toAbsolute(raw, location.href);
+      const absolute =
+        toAbsolute(raw, location.href) ||
+        inferUltraResourceUrlFromNode(node, location.href, parseCourseId(location.href));
       if (!absolute || seen.has(absolute)) {
         continue;
       }
@@ -903,7 +1042,7 @@
           node.textContent ||
           filenameFromUrl(absolute)
         ),
-        folder: classifyPage(location.href),
+        folder: extractFolderPath(node, document, classifyPage(location.href)),
         sourcePage: location.href
       });
     }
