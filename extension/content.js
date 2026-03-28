@@ -114,6 +114,9 @@
       .slice(0, 180) || "item";
   }
   function toAbsolute(url, baseUrl) {
+    if (!url) {
+      return "";
+    }
     try {
       return new URL(url, baseUrl || location.href).toString();
     } catch (_err) {
@@ -149,9 +152,21 @@
       return "";
     }
     const raw = String(url).trim();
+    const directId = raw.match(/^(_\d+_1)$/i);
+    if (directId && directId[1]) {
+      return directId[1];
+    }
     const fromCourseIdAttr = raw.match(/course-id-(_\d+_1)/i);
     if (fromCourseIdAttr && fromCourseIdAttr[1]) {
       return fromCourseIdAttr[1];
+    }
+    const fromCourseList = raw.match(/course-list-course-(_\d+_1)/i);
+    if (fromCourseList && fromCourseList[1]) {
+      return fromCourseList[1];
+    }
+    const fromCourseNameLike = raw.match(/course-(?:name|link|details|banner)-(_\d+_1)/i);
+    if (fromCourseNameLike && fromCourseNameLike[1]) {
+      return fromCourseNameLike[1];
     }
     const ultra = url.match(/\/courses\/([^/?#]+)/i);
     if (ultra && ultra[1]) {
@@ -385,9 +400,25 @@
     const card = node.closest(
       "[data-course-id],[data-courseid],[class*='course-card'],[class*='courseCard'],li,article,div"
     );
+    const termGroupHeading = (() => {
+      if (!card) {
+        return "";
+      }
+      const group = card.closest(".default-group");
+      if (!group) {
+        return "";
+      }
+      const prev = group.previousElementSibling;
+      if (!prev) {
+        return "";
+      }
+      const heading = prev.querySelector("h3");
+      return (heading && heading.textContent) || "";
+    })();
 
     const sources = [
       courseName,
+      termGroupHeading,
       node.getAttribute("data-term"),
       node.getAttribute("data-term-name"),
       node.getAttribute("data-period"),
@@ -597,7 +628,7 @@
       ...Array.from(document.querySelectorAll("a[href]")),
       ...Array.from(
         document.querySelectorAll(
-          "[data-course-id],[data-courseid],[course-id]"
+          "[data-course-id],[data-courseid],[course-id],[id^='course-id-'],[id^='course-list-course-'],[id^='course-link-']"
         )
       )
     ];
