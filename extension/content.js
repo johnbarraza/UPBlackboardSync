@@ -1405,7 +1405,7 @@
     );
 
     if (hasAnnouncementSignal) {
-      if (settings.contentTypes.text && settings.contentTypes.announcements !== false) {
+      if (settings.contentTypes.announcements !== false) {
         const items = collectAnnouncementItems(doc, pageUrl, course.id);
         if (items.length === 0) {
           const emptyKey = `${course.id}::__empty_announcements__`;
@@ -1468,7 +1468,6 @@
     if (
       !isErrorPage &&
       isAnnouncementDetailPage &&
-      settings.contentTypes.text &&
       settings.contentTypes.announcements !== false
     ) {
       const detail = extractAnnouncementDetail(pageUrl, doc);

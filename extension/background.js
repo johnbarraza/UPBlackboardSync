@@ -963,6 +963,36 @@ function getDebugRuntimeInfo() {
   };
 }
 
+function getDebugSettingsSnapshot(settings) {
+  const contentTypes = settings && settings.contentTypes ? settings.contentTypes : {};
+  return {
+    universityLabel: String((settings && settings.universityLabel) || ""),
+    preferredHost: String((settings && settings.preferredHost) || ""),
+    exportPreset: String((settings && settings.exportPreset) || ""),
+    contentTypes: {
+      filesFolders: !!contentTypes.filesFolders,
+      pages: !!contentTypes.pages,
+      assignments: !!contentTypes.assignments,
+      discussions: !!contentTypes.discussions,
+      announcements: contentTypes.announcements !== false,
+      modules: !!contentTypes.modules,
+      syllabus: !!contentTypes.syllabus,
+      gradesCsv: !!contentTypes.gradesCsv,
+      linkedExtracted: !!contentTypes.linkedExtracted,
+      text: !!contentTypes.text
+    },
+    conflictHandling: String((settings && settings.conflictHandling) || ""),
+    delayMs: Number((settings && settings.delayMs) || 0),
+    folderPrefix: String((settings && settings.folderPrefix) || ""),
+    zipBundling: !!(settings && settings.zipBundling),
+    incrementalMode: !!(settings && settings.incrementalMode),
+    debugMode: !!(settings && settings.debugMode),
+    excludeVideo: !!(settings && settings.excludeVideo),
+    maxFileSizeMb: Number((settings && settings.maxFileSizeMb) || 0),
+    maxPagesPerCourse: Number((settings && settings.maxPagesPerCourse) || 0)
+  };
+}
+
 async function downloadDataFile(filename, mime, textOrBytes, conflictAction) {
   const bytes = textOrBytes instanceof Uint8Array ? textOrBytes : toUtf8Bytes(textOrBytes);
   const url = uint8ToDataUrl(bytes, mime);
@@ -978,6 +1008,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
   const debugEnabled = !!settings.debugMode;
   const debugEntries = [];
   const debugRuntime = debugEnabled ? getDebugRuntimeInfo() : null;
+  const debugSettings = debugEnabled ? getDebugSettingsSnapshot(settings) : null;
   const processStartedAt = Date.now();
   const tickTack = [];
   const addTick = (label, extra) => {
@@ -1228,6 +1259,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       const report = {
         generatedAt: new Date().toISOString(),
         runtime: debugRuntime,
+        settings: debugSettings,
         timing: {
           totalMs,
           crawlMs,
@@ -1406,6 +1438,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       const report = {
         generatedAt: new Date().toISOString(),
         runtime: debugRuntime,
+        settings: debugSettings,
         timing: {
           totalMs,
           crawlMs,
