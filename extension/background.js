@@ -526,13 +526,26 @@ function isStaticFallbackCandidate(rawUrl) {
     if (/\.(css|js|map|ico)$/i.test(path)) {
       return true;
     }
-    if ((/blackboardcdn\.com$/i.test(host) || /(^|\.)bb\.com$/i.test(host)) && /\/images\//i.test(path)) {
+    if ((/blackboardcdn\.com$/i.test(host) || /(^|\.)bb\.com$/i.test(host)) && /\/images/i.test(path)) {
       return true;
     }
     return false;
   } catch (_err) {
     return false;
   }
+}
+
+function isStrongDownloadCandidate(rawUrl) {
+  const lower = String(rawUrl || "").toLowerCase();
+  return (
+    /\/bbcswebdav\//i.test(lower) ||
+    /xythos-download/i.test(lower) ||
+    /\/webapps\/blackboard\/execute\/content\/file/i.test(lower) ||
+    /[?&]cmd=download/i.test(lower) ||
+    /[?&]download=true/i.test(lower) ||
+    /\/outline\/file\/[^/?#]+\/download/i.test(lower) ||
+    /\/outline\/edit\/document\/[^/?#]+\/download/i.test(lower)
+  );
 }
 
 function buildFetchCandidates(rawUrl) {
@@ -588,6 +601,10 @@ function extractDownloadCandidatesFromHtml(html, baseUrl) {
     .replace(/\\u003d/gi, "=")
     .replace(/\\u002d/gi, "-");
 
+  const sourceLooksLikeFileView = /\/ultra\/courses\/[^/]+\/outline\/(?:file|edit\/document)\//i.test(
+    String(baseUrl || "")
+  );
+
   const addCandidate = (raw) => {
     if (!raw) {
       return;
@@ -606,6 +623,9 @@ function extractDownloadCandidatesFromHtml(html, baseUrl) {
     }
     const bbNormalized = normalizeBbcswebdavUrl(normalized);
     if (isStaticFallbackCandidate(bbNormalized)) {
+      return;
+    }
+    if (sourceLooksLikeFileView && !isStrongDownloadCandidate(bbNormalized)) {
       return;
     }
     if (!isLikelyBinaryUrl(bbNormalized)) {
@@ -674,6 +694,9 @@ async function fetchResourceWithFallback(url) {
   const tried = new Set();
   let htmlFallback = null;
   let lastError = null;
+  const sourceLooksLikeFileView = /\/ultra\/courses\/[^/]+\/outline\/(?:file|edit\/document)\//i.test(
+    String(url || "")
+  );
 
   const tryCandidate = async (candidateUrl) => {
     if (!candidateUrl || tried.has(candidateUrl)) {
@@ -683,6 +706,12 @@ async function fetchResourceWithFallback(url) {
     const fetched = await fetchResource(candidateUrl);
     const htmlLike = (fetched.meta.contentType || "").toLowerCase().includes("html") || looksLikeHtml(fetched.bytes);
     if (!htmlLike) {
+      if (isStaticFallbackCandidate(candidateUrl)) {
+        return null;
+      }
+      if (sourceLooksLikeFileView && !isStrongDownloadCandidate(candidateUrl)) {
+        return null;
+      }
       return { ...fetched, resolvedUrl: candidateUrl };
     }
     if (!htmlFallback) {
