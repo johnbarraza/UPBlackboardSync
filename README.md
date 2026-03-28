@@ -1,7 +1,7 @@
 # UP BlackboardSync
 ### Automatic Downloads Of Your Blackboard Content
 This is a fork for the Universidad del Pacifico (Peru)
-[![Get on PyPI][pypi-shield]][pypi] [![License: GPL  v2][license-shield]][gnu] [![Build][build-shield]][actions] [![GitHub Downloads][downloads-shield]][releases] [![Latest Release][latest-shield]][stable] [![Matrix][matrix-shield]][matrix]
+[![Get on PyPI][pypi-shield]][pypi] [![License: GPL  v2][license-shield]][gnu] [![Build][build-shield]][actions] [![GitHub Downloads][downloads-shield]][releases] [![Latest Release Downloads][release-downloads-shield]][stable] [![Latest Release][latest-shield]][stable] [![GitHub Stars][stars-shield]][stars] [![Matrix][matrix-shield]][matrix]
 
 **BlackboardSync** performs a periodic,
 incremental download of all your Blackboard content,
@@ -119,7 +119,7 @@ Releases are created by GitHub Actions workflows:
   - Output: Chrome (`.zip`) and Firefox (`.xpi`) extension files attached to the same release
 - Browser extension release workflow: [release-extension.yml][ext-workflow]
   - Trigger: push tag like `ext-v0.1.0`
-  - Output: `blackboardsync-extension-<version>.zip` as a GitHub Release asset
+  - Output: `blackboardsync-extension-chrome-<version>.zip` and `blackboardsync-extension-firefox-<version>.xpi` as GitHub Release assets
 
 Download counters are shown in the `GitHub Downloads` badge above and update automatically from GitHub release stats.
 
@@ -189,7 +189,10 @@ Flathub team for their quick work in approving the app :heart:
 [ext-assets-workflow]: https://github.com/johnbarraza/UPBlackboardSync/blob/main/.github/workflows/release-extension-assets.yml
 [ext-workflow]: https://github.com/johnbarraza/UPBlackboardSync/blob/main/.github/workflows/release-extension.yml
 [downloads-shield]: https://img.shields.io/github/downloads/johnbarraza/UPBlackboardSync/total?label=github%20downloads
+[release-downloads-shield]: https://img.shields.io/github/downloads/johnbarraza/UPBlackboardSync/latest/total?label=latest%20release%20downloads
 [latest-shield]: https://img.shields.io/github/v/release/johnbarraza/UPBlackboardSync?display_name=tag
+[stars-shield]: https://img.shields.io/github/stars/johnbarraza/UPBlackboardSync?style=social
+[stars]: https://github.com/johnbarraza/UPBlackboardSync/stargazers
 
 <!-- Packages -->
 
