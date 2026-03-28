@@ -294,6 +294,62 @@ function setFolderMaterials(courseId, folder, checked) {
   renderMaterialList();
 }
 
+async function downloadFolderMaterials(courseId, folder) {
+  const data = detectedByCourse.get(courseId);
+  if (!data) {
+    setStatus("No preview data for that folder.");
+    return;
+  }
+  const allItems = (data.items || []).filter((item) => String(item.folder || "") === String(folder || ""));
+  if (allItems.length === 0) {
+    setStatus("Folder has no detected materials.");
+    return;
+  }
+
+  const selectedItems = allItems.filter((item) => selectedMaterialKeys.has(materialKey(courseId, item.url)));
+  const targetItems = selectedItems.length > 0 ? selectedItems : allItems;
+
+  const payload = {
+    tabId: activeTabId,
+    courses: [data.course],
+    incrementalMode: !!(settings && settings.incrementalMode),
+    debugMode: !!(settings && settings.debugMode),
+    selectedResourceUrlsByCourse: {
+      [courseId]: targetItems.map((item) => item.url)
+    },
+    selectedResourcesByCourse: {
+      [courseId]: targetItems.map((item) => ({
+        url: item.url,
+        title: item.title || "resource",
+        folder: item.folder || "files",
+        sourcePage: item.sourcePage || ""
+      }))
+    }
+  };
+
+  setStatus(`Downloading folder "${folder}" (${targetItems.length} item(s))...`);
+  const resp = await chrome.runtime.sendMessage({
+    type: "download-courses",
+    payload
+  });
+  if (!resp || !resp.ok) {
+    setStatus(`Error: ${resp && resp.error ? resp.error : "Unknown"}`);
+    return;
+  }
+  const s = (resp.result && resp.result.summaries && resp.result.summaries[0]) || null;
+  if (!s) {
+    setStatus("Folder download completed.");
+    return;
+  }
+  const reasonEntries = Object.entries(s.skippedByReason || {});
+  const reasonSummary = reasonEntries.length
+    ? ` | reasons=${reasonEntries.map(([k, v]) => `${k}:${v}`).join(", ")}`
+    : "";
+  setStatus(
+    `Folder done: ${s.courseName} | resources=${s.foundResources}, downloaded=${s.downloaded}, skipped=${s.skipped}${reasonSummary}`
+  );
+}
+
 function renderMaterialList() {
   const summary = document.getElementById("material-summary");
   const container = document.getElementById("material-list");
@@ -364,8 +420,17 @@ function renderMaterialList() {
       clearBtn.dataset.courseId = courseId;
       clearBtn.dataset.folder = folder;
 
+      const downloadBtn = document.createElement("button");
+      downloadBtn.type = "button";
+      downloadBtn.className = "tiny-btn";
+      downloadBtn.textContent = "Download";
+      downloadBtn.dataset.folderAction = "download";
+      downloadBtn.dataset.courseId = courseId;
+      downloadBtn.dataset.folder = folder;
+
       actions.appendChild(selectBtn);
       actions.appendChild(clearBtn);
+      actions.appendChild(downloadBtn);
       folderHeader.appendChild(actions);
       section.appendChild(folderHeader);
 
@@ -711,7 +776,13 @@ document.getElementById("material-list").addEventListener("click", (event) => {
   if (!courseId) {
     return;
   }
-  setFolderMaterials(courseId, folder, action === "select");
+  if (action === "select" || action === "clear") {
+    setFolderMaterials(courseId, folder, action === "select");
+    return;
+  }
+  if (action === "download") {
+    downloadFolderMaterials(courseId, folder).catch((err) => setStatus(`Error: ${String(err)}`));
+  }
 });
 
 document.getElementById("debug-mode-toggle").addEventListener("change", async (event) => {

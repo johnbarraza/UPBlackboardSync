@@ -553,6 +553,12 @@ function buildFetchCandidates(rawUrl) {
   if (fileMatch) {
     out.add(`${parsed.origin}/ultra/courses/${fileMatch[1]}/outline/file/${fileMatch[2]}/download`);
     out.add(`${parsed.origin}/ultra/courses/${fileMatch[1]}/outline/file/${fileMatch[2]}?download=true`);
+    out.add(
+      `${parsed.origin}/webapps/blackboard/execute/content/file?cmd=download&content_id=${encodeURIComponent(fileMatch[2])}&course_id=${encodeURIComponent(fileMatch[1])}`
+    );
+    out.add(
+      `${parsed.origin}/webapps/blackboard/execute/content/file?cmd=view&content_id=${encodeURIComponent(fileMatch[2])}&course_id=${encodeURIComponent(fileMatch[1])}`
+    );
   }
 
   const docMatch = parsed.pathname.match(/^\/ultra\/courses\/([^/]+)\/outline\/edit\/document\/([^/?#]+)/i);
@@ -575,10 +581,26 @@ function extractDownloadCandidatesFromHtml(html, baseUrl) {
     .replace(/&amp;/gi, "&")
     .replace(/&#x2f;/gi, "/")
     .replace(/&#47;/g, "/")
-    .replace(/&quot;/gi, "\"");
+    .replace(/&quot;/gi, "\"")
+    .replace(/\\u002f/gi, "/")
+    .replace(/\\u003a/gi, ":")
+    .replace(/\\u0026/gi, "&")
+    .replace(/\\u003d/gi, "=")
+    .replace(/\\u002d/gi, "-");
 
   const addCandidate = (raw) => {
-    const normalized = normalizeUrl(raw ? new URL(raw, baseUrl).toString() : "");
+    if (!raw) {
+      return;
+    }
+    let candidateRaw = String(raw).trim();
+    if (/%2f|%3a|%3d|%26/i.test(candidateRaw)) {
+      try {
+        candidateRaw = decodeURIComponent(candidateRaw);
+      } catch (_err) {
+        // keep as-is
+      }
+    }
+    const normalized = normalizeUrl(candidateRaw ? new URL(candidateRaw, baseUrl).toString() : "");
     if (!normalized) {
       return;
     }
@@ -596,6 +618,7 @@ function extractDownloadCandidatesFromHtml(html, baseUrl) {
   const attrRe = /(?:href|src)\s*=\s*["']([^"']+)["']/gi;
   const iframeRe = /<iframe[^>]+src\s*=\s*["']([^"']+)["']/gi;
   const urlRe = /https?:\/\/[^"'\\\s<>]+|\/[^"'\\\s<>]+/gi;
+  const encodedUrlRe = /(https?%3a%2f%2f[^"'\\\s<>]+|%2f[^"'\\\s<>]+)/gi;
 
   for (const text of inputs) {
     for (const match of text.matchAll(attrRe)) {
@@ -619,6 +642,18 @@ function extractDownloadCandidatesFromHtml(html, baseUrl) {
     }
 
     for (const match of text.matchAll(urlRe)) {
+      const candidate = match[0];
+      if (!candidate) {
+        continue;
+      }
+      try {
+        addCandidate(candidate);
+      } catch (_err) {
+        // ignore malformed URLs
+      }
+    }
+
+    for (const match of text.matchAll(encodedUrlRe)) {
       const candidate = match[0];
       if (!candidate) {
         continue;
