@@ -956,6 +956,55 @@
     };
   }
 
+  function hashText(value) {
+    let h = 0;
+    const text = String(value || "");
+    for (let i = 0; i < text.length; i += 1) {
+      h = ((h * 31) + text.charCodeAt(i)) >>> 0;
+    }
+    return h.toString(16);
+  }
+
+  function collectInlineAnnouncementPanelDetails(doc) {
+    const out = [];
+    const panels = Array.from(
+      doc.querySelectorAll(".announcement-detail-panel .panel-wrap, .announcement-detail-panel")
+    );
+    for (const panel of panels) {
+      const titleRaw = (
+        (panel.querySelector("h1.panel-title") && panel.querySelector("h1.panel-title").textContent) ||
+        (panel.querySelector(".panel-title") && panel.querySelector(".panel-title").textContent) ||
+        ""
+      ).trim();
+      const title = sanitizeName(titleRaw || "Announcement");
+      const bodyNode =
+        panel.querySelector(".panel-container .ql-editor") ||
+        panel.querySelector(".panel-container .body-text") ||
+        panel.querySelector(".panel-content .body-text");
+      const bodyText = fixMojibake((bodyNode && bodyNode.textContent) || "")
+        .replace(/\r/g, "")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .join("\n");
+      if (!bodyText) {
+        continue;
+      }
+      const detailId = `inline-${hashText(`${title}\n${bodyText.slice(0, 2000)}`)}`;
+      out.push({
+        id: detailId,
+        title,
+        body: `Title: ${title}\n\n${bodyText}\n`
+      });
+    }
+    return out;
+  }
+
+  function hasExplicitNoAnnouncementsText(doc) {
+    const text = fixMojibake((doc.body && doc.body.textContent) || "").toLowerCase();
+    return /\b(no announcements?|sin anuncios?)\b/.test(text);
+  }
+
   function inferUltraResourceUrlFromNode(node, pageUrl, courseId) {
     const contentNode = node.closest("[data-content-id]");
     const contentId = contentNode && contentNode.getAttribute("data-content-id");
@@ -1253,7 +1302,7 @@
 
   async function expandAllCourseContent(doc) {
     // Blackboard Ultra lazily renders children only after expand.
-    for (let round = 0; round < 6; round += 1) {
+    for (let round = 0; round < 4; round += 1) {
       const collapsed = collectCollapsedContentToggles(doc);
       if (collapsed.length === 0) {
         return;
@@ -1264,9 +1313,9 @@
         } catch (_err) {
           // ignore UI interaction issues
         }
-        await sleep(90);
+        await sleep(40);
       }
-      await sleep(280);
+      await sleep(140);
     }
   }
 
@@ -1282,7 +1331,9 @@
     resources,
     textFiles,
     gradeRows,
-    seenAnnouncementItems,
+    seenAnnouncementFallbacks,
+    seenAnnouncementDetails,
+    pendingAnnouncementFallbacks,
     folderPaths
   ) {
     const isErrorPage = isBlackboardErrorPage(doc, html, pageUrl);
@@ -1358,8 +1409,13 @@
         const items = collectAnnouncementItems(doc, pageUrl, course.id);
         if (items.length === 0) {
           const emptyKey = `${course.id}::__empty_announcements__`;
-          if (!seenAnnouncementItems.has(emptyKey)) {
-            seenAnnouncementItems.add(emptyKey);
+          if (
+            hasExplicitNoAnnouncementsText(doc) &&
+            !seenAnnouncementFallbacks.has(emptyKey) &&
+            pendingAnnouncementFallbacks.size === 0 &&
+            seenAnnouncementDetails.size === 0
+          ) {
+            seenAnnouncementFallbacks.add(emptyKey);
             textFiles.push({
               path: "announcements/_no_announcements.txt",
               body: "No announcements found.\n"
@@ -1367,20 +1423,40 @@
           }
         }
         for (const item of items) {
-          if (item.detailUrl) {
-            addUrlToQueue(queue, seenPages, item.detailUrl);
-          } else {
-            const dedupeKey = `${course.id}::${item.id}`;
-            if (seenAnnouncementItems.has(dedupeKey)) {
-              continue;
-            }
-            seenAnnouncementItems.add(dedupeKey);
+          const dedupeKey = `${course.id}::${item.id}`;
+          if (!pendingAnnouncementFallbacks.has(dedupeKey)) {
             const postedPrefix = item.posted ? `${sanitizeName(item.posted)} - ` : "";
-            textFiles.push({
+            pendingAnnouncementFallbacks.set(dedupeKey, {
               path: `announcements/${postedPrefix}${item.title}.txt`,
               body: item.body
             });
           }
+          if (item.detailUrl) {
+            addUrlToQueue(queue, seenPages, item.detailUrl);
+          } else {
+            if (seenAnnouncementFallbacks.has(dedupeKey) || seenAnnouncementDetails.has(dedupeKey)) {
+              continue;
+            }
+            const fallback = pendingAnnouncementFallbacks.get(dedupeKey);
+            if (fallback) {
+              textFiles.push(fallback);
+              pendingAnnouncementFallbacks.delete(dedupeKey);
+            }
+            seenAnnouncementFallbacks.add(dedupeKey);
+          }
+        }
+
+        const inlineDetails = collectInlineAnnouncementPanelDetails(doc);
+        for (const detail of inlineDetails) {
+          const dedupeKey = `${course.id}::${detail.id}`;
+          if (seenAnnouncementDetails.has(dedupeKey)) {
+            continue;
+          }
+          seenAnnouncementDetails.add(dedupeKey);
+          textFiles.push({
+            path: `announcements/${detail.title}.txt`,
+            body: detail.body
+          });
         }
       }
       for (const seed of buildCourseSeedUrls(course.id, pageUrl)) {
@@ -1398,8 +1474,9 @@
       const detail = extractAnnouncementDetail(pageUrl, doc);
       if (detail) {
         const dedupeKey = `${course.id}::${detail.id}`;
-        if (!seenAnnouncementItems.has(dedupeKey)) {
-          seenAnnouncementItems.add(dedupeKey);
+        if (!seenAnnouncementDetails.has(dedupeKey)) {
+          seenAnnouncementDetails.add(dedupeKey);
+          pendingAnnouncementFallbacks.delete(dedupeKey);
           textFiles.push({
             path: `announcements/${detail.title}.txt`,
             body: detail.body
@@ -1414,7 +1491,9 @@
     const queue = [];
     const seenPages = new Set();
     const seenResources = new Set();
-    const seenAnnouncementItems = new Set();
+    const seenAnnouncementFallbacks = new Set();
+    const seenAnnouncementDetails = new Set();
+    const pendingAnnouncementFallbacks = new Map();
     const resources = [];
     const textFiles = [];
     const gradeRows = [];
@@ -1445,7 +1524,9 @@
         resources,
         textFiles,
         gradeRows,
-        seenAnnouncementItems,
+        seenAnnouncementFallbacks,
+        seenAnnouncementDetails,
+        pendingAnnouncementFallbacks,
         folderPaths
       );
 
@@ -1481,9 +1562,19 @@
         resources,
         textFiles,
         gradeRows,
-        seenAnnouncementItems,
+        seenAnnouncementFallbacks,
+        seenAnnouncementDetails,
+        pendingAnnouncementFallbacks,
         folderPaths
       );
+    }
+
+    for (const [dedupeKey, fallback] of pendingAnnouncementFallbacks.entries()) {
+      if (seenAnnouncementDetails.has(dedupeKey) || seenAnnouncementFallbacks.has(dedupeKey)) {
+        continue;
+      }
+      seenAnnouncementFallbacks.add(dedupeKey);
+      textFiles.push(fallback);
     }
 
     return {

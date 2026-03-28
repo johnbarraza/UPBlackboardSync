@@ -88,7 +88,7 @@ const DEFAULT_SETTINGS = {
     text: true
   },
   conflictHandling: "uniquify",
-  delayMs: 250,
+  delayMs: 75,
   folderPrefix: "",
   zipBundling: true,
   incrementalMode: false,
@@ -978,6 +978,26 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
   const debugEnabled = !!settings.debugMode;
   const debugEntries = [];
   const debugRuntime = debugEnabled ? getDebugRuntimeInfo() : null;
+  const processStartedAt = Date.now();
+  const tickTack = [];
+  const addTick = (label, extra) => {
+    if (!debugEnabled) {
+      return;
+    }
+    tickTack.push({
+      label,
+      tMs: Date.now() - processStartedAt,
+      at: new Date().toISOString(),
+      ...(extra || {})
+    });
+  };
+  let crawlMs = 0;
+  let downloadMs = 0;
+  addTick("start", {
+    zipBundling: !!settings.zipBundling,
+    incrementalMode: !!settings.incrementalMode,
+    delayMs: Number(settings.delayMs || 0)
+  });
   const fallbackUrl = settings.preferredHost
     ? `https://${settings.preferredHost}/ultra/courses/${encodeURIComponent(course.id)}/outline`
     : "";
@@ -989,6 +1009,7 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
 
   let data;
   if (Array.isArray(selectedResourceItems) && selectedResourceItems.length > 0) {
+    addTick("crawl:skip_selected_resources", { selectedItems: selectedResourceItems.length });
     data = {
       course: resolvedCourse,
       crawledPages: 0,
@@ -1005,6 +1026,8 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       gradeRows: []
     };
   } else {
+    const crawlStartedAt = Date.now();
+    addTick("crawl:start");
     const crawlResp = await sendToTab(tabId, {
       type: "crawl-course",
       course: resolvedCourse,
@@ -1015,6 +1038,13 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       throw new Error(crawlResp && crawlResp.error ? crawlResp.error : "Could not crawl course");
     }
     data = crawlResp.data;
+    crawlMs = Date.now() - crawlStartedAt;
+    addTick("crawl:end", {
+      ms: crawlMs,
+      crawledPages: Number(data.crawledPages || 0),
+      discoveredResources: Array.isArray(data.resources) ? data.resources.length : 0,
+      discoveredTextFiles: Array.isArray(data.textFiles) ? data.textFiles.length : 0
+    });
   }
 
   let resources = dedupeResources(data.resources);
@@ -1031,6 +1061,12 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
   const folderManifest = buildFolderManifest(resources, data.folders || []);
   const downloaded = [];
   const skipped = [];
+  addTick("prepare:end", {
+    resources: resources.length,
+    textFiles: textFiles.length,
+    gradeRows: gradeRows.length,
+    folderManifest: folderManifest.length
+  });
 
   const host = resolvedUrl ? new URL(resolvedUrl).host : "unknown-host";
   const hostRoot = historyRoot[host] || {};
@@ -1040,6 +1076,8 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
   const courseFolder = `${prefix}${sanitizeName(course.name || course.id)}`;
 
   if (settings.zipBundling) {
+    const downloadStartedAt = Date.now();
+    addTick("download:start", { mode: "zip", resources: resources.length });
     const filesForZip = [];
     const zipFolderEntries = new Set();
 
@@ -1176,11 +1214,26 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
         bytes: toUtf8Bytes(buildGradesCsv(gradeRows))
       });
     }
+    downloadMs = Date.now() - downloadStartedAt;
+    addTick("download:end", {
+      mode: "zip",
+      ms: downloadMs,
+      downloaded: downloaded.length,
+      skipped: skipped.length
+    });
 
     if (debugEnabled) {
+      addTick("report:build", { debugEntries: debugEntries.length });
+      const totalMs = Date.now() - processStartedAt;
       const report = {
         generatedAt: new Date().toISOString(),
         runtime: debugRuntime,
+        timing: {
+          totalMs,
+          crawlMs,
+          downloadMs
+        },
+        tickTack,
         courseId: course.id,
         courseName: course.name,
         crawledPages: data.crawledPages,
@@ -1201,6 +1254,8 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
       await downloadDataFile(zipName, "application/zip", zip, settings.conflictHandling);
     }
   } else {
+    const downloadStartedAt = Date.now();
+    addTick("download:start", { mode: "direct", resources: resources.length });
     const nonEmptyFolders = new Set();
 
     for (const textFile of textFiles) {
@@ -1337,11 +1392,26 @@ async function processCourse(tabId, course, settings, historyRoot, selectedResou
         settings.conflictHandling
       );
     }
+    downloadMs = Date.now() - downloadStartedAt;
+    addTick("download:end", {
+      mode: "direct",
+      ms: downloadMs,
+      downloaded: downloaded.length,
+      skipped: skipped.length
+    });
 
     if (debugEnabled) {
+      addTick("report:build", { debugEntries: debugEntries.length });
+      const totalMs = Date.now() - processStartedAt;
       const report = {
         generatedAt: new Date().toISOString(),
         runtime: debugRuntime,
+        timing: {
+          totalMs,
+          crawlMs,
+          downloadMs
+        },
+        tickTack,
         courseId: course.id,
         courseName: course.name,
         crawledPages: data.crawledPages,
