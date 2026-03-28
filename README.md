@@ -1,6 +1,6 @@
 # UP BlackboardSync
 ### Automatic Downloads Of Your Blackboard Content
-This is a fork for the Universidad del Pacifico (Peru)
+Fork maintained for Universidad del Pacifico (Peru) by [`johnbarraza/UPBlackboardSync`](https://github.com/johnbarraza/UPBlackboardSync).
 [![Get on PyPI][pypi-shield]][pypi] [![License: GPL  v2][license-shield]][gnu] [![Build][build-shield]][actions] [![GitHub Downloads][downloads-shield]][releases] [![Latest Release Downloads][release-downloads-shield]][stable] [![Latest Release][latest-shield]][stable] [![GitHub Stars][stars-shield]][stars] [![Matrix][matrix-shield]][matrix]
 
 **BlackboardSync** performs a periodic,
@@ -97,7 +97,7 @@ blackboardsync
 ##### Requires [Python >=3.10, pip][python], [pipenv][pipenv], [git][git]
 
 ```bash
-git clone https://github.com/sanjacob/BlackboardSync.git
+git clone https://github.com/johnbarraza/UPBlackboardSync.git
 cd BlackboardSync
 pipenv install
 pipenv run python -m blackboard_sync
@@ -137,19 +137,6 @@ More details available at [CONTRIBUTING.md](CONTRIBUTING.md)
 Open a GitHub issue [here][issues].
 
 
-## Show Your Support
-
-##### Ko-fi ☕
-[![Support BBSync on ko-fi][kofi-shield]][kofi]
-
-##### LiberaPay
-[![LiberaPay][lp-shield]][liberapay]
-
-##### Bitcoin ₿
-
-`bc1qhvcs07y3jnf09kahefscs05gxlmvhu542wzvgp`
-
-If you wish to contribute in a different way, please inquire.
 
 
 ## License
@@ -167,7 +154,7 @@ more information available at the [Free Software Foundation][gnu].
 [PyInstaller][pyinstaller]
 
 README templates/guide by [tonycrosby-tech][tonycrosby], [neildrew][neildrew],
-and [Rita Łyczywek][bulldogjob]
+and [Rita Lyczywek][bulldogjob]
 
 Flathub team for their quick work in approving the app :heart:
 
@@ -201,17 +188,13 @@ Flathub team for their quick work in approving the app :heart:
 [stable]: https://github.com/johnbarraza/UPBlackboardSync/releases/latest
 [releases]: https://github.com/johnbarraza/UPBlackboardSync/releases
 [issues]: https://github.com/johnbarraza/UPBlackboardSync/issues
-[kofi]: https://ko-fi.com/sanjacob
-[kofi-shield]: https://img.shields.io/badge/ko--fi-support-ff5e5b?logo=ko-fi&logoColor=white
-[liberapay]: https://liberapay.com/sanjacob
-[lp-shield]: https://img.shields.io/liberapay/receives/sanjacob
 
 
 <!-- Licence -->
 
 [license]: LICENSE "General Public License"
 [gnu]: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html "Free Software Foundation"
-[license-shield]: https://img.shields.io/github/license/sanjacob/BlackboardSync?color=%23241F21
+[license-shield]: https://img.shields.io/github/license/johnbarraza/UPBlackboardSync?color=%23241F21
 
 <!-- Acknowledgements & README Templates -->
 
