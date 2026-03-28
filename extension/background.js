@@ -105,27 +105,48 @@ const BLACKBOARD_DOCUMENT_ROUTE_RE = /\/ultra\/courses\/[^/]+\/outline\/edit\/do
 const DOWNLOAD_HINT_RE = /(bbcswebdav|xythos-download|\/download\b|[?&]download=)/i;
 const MOJIBAKE_RE = /(?:\u00C3|\u00C2|\u00E2|\uFFFD)/;
 
+function mojibakeScore(value) {
+  return (String(value || "").match(/[\u00C2\u00C3\u00E2\uFFFD]/g) || []).length;
+}
+
+function decodeLatin1AsUtf8(value) {
+  const bytes = new Uint8Array(Array.from(String(value || ""), (ch) => ch.charCodeAt(0) & 0xff));
+  return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+}
+
 function fixMojibake(input) {
   const raw = String(input || "");
   if (!MOJIBAKE_RE.test(raw)) {
     return raw;
   }
-  try {
-    const bytes = new Uint8Array(Array.from(raw, (ch) => ch.charCodeAt(0) & 0xff));
-    const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-    const badRaw = (raw.match(/[\u00C2\u00C3\u00E2\uFFFD]/g) || []).length;
-    const badDecoded = (decoded.match(/[\u00C2\u00C3\u00E2\uFFFD]/g) || []).length;
-    if (badDecoded < badRaw) {
-      return decoded;
+
+  let best = raw;
+  let bestScore = mojibakeScore(raw);
+  let current = raw;
+
+  for (let i = 0; i < 3; i += 1) {
+    try {
+      const decoded = decodeLatin1AsUtf8(current);
+      if (!decoded || decoded === current) {
+        break;
+      }
+      const score = mojibakeScore(decoded);
+      if (score < bestScore) {
+        best = decoded;
+        bestScore = score;
+      }
+      current = decoded;
+    } catch (_err) {
+      break;
     }
-  } catch (_err) {
-    // keep original text
   }
-  return raw;
+
+  return bestScore < mojibakeScore(raw) ? best : raw;
 }
 
 function sanitizeName(input) {
   return fixMojibake(String(input || ""))
+    .normalize("NFC")
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
     .replace(/\s+/g, " ")
     .trim()
