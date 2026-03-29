@@ -26,7 +26,12 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=get_datas(),
-    hiddenimports=[],
+    hiddenimports=[
+        'googleapiclient',
+        'googleapiclient.discovery',
+        'google_auth_oauthlib',
+        'google.auth.transport.requests',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
