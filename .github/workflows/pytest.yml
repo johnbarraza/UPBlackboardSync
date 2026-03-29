@@ -22,7 +22,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[test]"
-          pip install flake8 mypy pytest-xvfb
+          pip install flake8 mypy pytest-xvfb types-requests
 
       - name: Install XVFB for gui testing
         run: |
