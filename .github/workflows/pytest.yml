@@ -34,7 +34,9 @@ jobs:
           flake8 blackboard_sync/content
 
       - name: Run type checker
-        run: mypy --strict blackboard_sync/qt
+        run: |
+          python -m mypy --install-types --non-interactive blackboard_sync/qt
+          mypy --strict blackboard_sync/qt
 
       - name: Run test suite
         run: pytest -vvvv

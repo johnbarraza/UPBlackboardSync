@@ -13,14 +13,14 @@ Este proyecto publica dos tipos de archivos:
 - Aplicacion de escritorio (desktop).
 - Extension de navegador para Chrome y Firefox.
 
-[![Build][build-shield]][actions]
+[![CI][build-shield]][actions]
 [![GitHub Downloads][downloads-shield]][releases]
 [![Latest Release Downloads][release-downloads-shield]][stable]
 [![Latest Release][latest-shield]][stable]
 [![GitHub Stars][stars-shield]][stars]
 
 [actions]: https://github.com/johnbarraza/UPBlackboardSync/actions
-[build-shield]: https://img.shields.io/github/actions/workflow/status/johnbarraza/UPBlackboardSync/build.yml?branch=main&label=build
+[build-shield]: https://img.shields.io/github/actions/workflow/status/johnbarraza/UPBlackboardSync/test.yml?branch=main&label=tests
 [downloads-shield]: https://img.shields.io/github/downloads/johnbarraza/UPBlackboardSync/total?label=github%20downloads
 [release-downloads-shield]: https://img.shields.io/github/downloads/johnbarraza/UPBlackboardSync/latest/total?label=latest%20release%20downloads
 [latest-shield]: https://img.shields.io/github/v/release/johnbarraza/UPBlackboardSync?display_name=tag
