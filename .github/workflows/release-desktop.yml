@@ -151,11 +151,11 @@ jobs:
           Copy-Item packaging\windows\*.ico replaced -Force
           Copy-Item packaging\windows\*.png replaced -Force
 
-      - name: Install NSIS
-        run: choco install nsis --no-progress -y
-
       - name: Build installer (.exe)
-        run: makensis /V3 /DVERSION=$env:VERSION replaced\pkg_win.nsi
+        uses: joncloud/makensis-action@v4.1
+        with:
+          script-file: replaced/pkg_win.nsi
+          arguments: "/V3 /DVERSION=${{ env.VERSION }}"
 
       - uses: actions/upload-artifact@v4
         with:
