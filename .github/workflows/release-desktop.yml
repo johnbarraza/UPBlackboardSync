@@ -153,19 +153,53 @@ jobs:
 
       - name: Install NSIS
         shell: powershell
-        run: choco install nsis --yes --no-progress
+        run: |
+          choco install nsis --yes --no-progress --limit-output
+
+          $chocoProfile = Join-Path $env:ChocolateyInstall "helpers\chocolateyProfile.psm1"
+          if (Test-Path $chocoProfile) {
+            Import-Module $chocoProfile
+            refreshenv
+          }
+
+          $cmd = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if (-not $cmd) {
+            Write-Host "NSIS not found after nsis install, trying nsis.portable..."
+            choco install nsis.portable --yes --no-progress --limit-output
+            if (Test-Path $chocoProfile) {
+              Import-Module $chocoProfile
+              refreshenv
+            }
+          }
 
       - name: Build installer (.exe)
         shell: powershell
         run: |
-          $candidates = @(
+          $candidates = New-Object System.Collections.Generic.List[string]
+
+          $cmd = Get-Command makensis.exe -ErrorAction SilentlyContinue
+          if ($cmd -and $cmd.Source) {
+            $candidates.Add($cmd.Source)
+          }
+
+          @(
             "$env:ProgramFiles(x86)\NSIS\makensis.exe",
             "$env:ProgramFiles\NSIS\makensis.exe",
             "C:\ProgramData\chocolatey\bin\makensis.exe"
-          )
+          ) | ForEach-Object { $candidates.Add($_) }
+
+          $chocoLibHits = Get-ChildItem "C:\ProgramData\chocolatey\lib" -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -ExpandProperty FullName
+          foreach ($hit in $chocoLibHits) {
+            $candidates.Add($hit)
+          }
 
           $makensis = $null
-          foreach ($candidate in $candidates) {
+          $uniqueCandidates = $candidates | Where-Object { $_ } | Select-Object -Unique
+          Write-Host "makensis candidates:"
+          $uniqueCandidates | ForEach-Object { Write-Host " - $_" }
+
+          foreach ($candidate in $uniqueCandidates) {
             if (Test-Path $candidate) {
               $makensis = $candidate
               break
@@ -173,8 +207,23 @@ jobs:
           }
 
           if (-not $makensis) {
-            Write-Error "Unable to locate makensis.exe after NSIS install."
-            exit 1
+            Write-Host "Unable to locate makensis.exe from installed locations, downloading portable NSIS..."
+            $portableUrl = "https://sourceforge.net/projects/nsis/files/NSIS%203/3.10/nsis-3.10.zip/download"
+            $portableZip = Join-Path $env:RUNNER_TEMP "nsis-3.10.zip"
+            $portableDir = Join-Path $env:RUNNER_TEMP "nsis-3.10"
+
+            Invoke-WebRequest -Uri $portableUrl -OutFile $portableZip
+            Expand-Archive -LiteralPath $portableZip -DestinationPath $portableDir -Force
+
+            $portableHit = Get-ChildItem $portableDir -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+
+            if ($portableHit -and (Test-Path $portableHit)) {
+              $makensis = $portableHit
+            } else {
+              Write-Error "Unable to locate makensis.exe after NSIS install and portable fallback."
+              exit 1
+            }
           }
 
           & $makensis "/V3" "/DVERSION=$env:VERSION" "replaced\pkg_win.nsi"
