@@ -1,6 +1,12 @@
 name: Attach Extension Assets
 
 on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: "Existing desktop release tag (example: 0.19.0)"
+        required: true
+        type: string
   push:
     tags:
       - "[0-9]*"
@@ -23,7 +29,9 @@ jobs:
       - name: Resolve tag
         id: vars
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"

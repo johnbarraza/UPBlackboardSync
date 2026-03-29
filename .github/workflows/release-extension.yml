@@ -1,6 +1,12 @@
 name: Release Extension
 
 on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: "Tag for the release (example: ext-v0.1.0)"
+        required: true
+        type: string
   push:
     tags:
       - "ext-v*"
@@ -23,7 +29,9 @@ jobs:
       - name: Resolve tag name
         id: vars
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_call" ]; then
+            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"

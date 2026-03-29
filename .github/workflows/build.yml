@@ -87,11 +87,20 @@ jobs:
           path: replaced/
 
   package-metadata:
+    if: ${{ github.repository_owner == 'sanjacob' }}
     needs: [ package-prep ]
     runs-on: ubuntu-latest
     env:
-      METADATA_TOKEN: ${{ github.event_name == 'push' && secrets.METADATA_PAT || secrets.GITHUB_TOKEN }}
+      METADATA_TOKEN: ${{ github.event_name == 'push' && secrets.METADATA_PAT || github.token }}
     steps:
+      - name: Validate metadata token
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "${{ secrets.METADATA_PAT }}" ]; then
+            echo "::error::Missing METADATA_PAT secret. GITHUB_TOKEN cannot push metadata repository."
+            exit 1
+          fi
+
       - name: Clone metadata repository
         uses: actions/checkout@v4
         with:
@@ -112,14 +121,24 @@ jobs:
 
       - run: |
           git add .
-          git commit -m "Generated from $GITHUB_REF_NAME" && git push origin HEAD || true
+          if git diff --cached --quiet; then
+            echo "No metadata changes to commit."
+            exit 0
+          fi
+
+          git commit -m "Generated from $GITHUB_REF_NAME"
+          git push origin HEAD
         working-directory: metadata
 
       - name: Create repository tag
         if: github.event_name == 'push'
         run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$GITHUB_REF_NAME" > /dev/null; then
+            echo "Tag $GITHUB_REF_NAME already exists in metadata repo. Skipping."
+            exit 0
+          fi
           git tag $GITHUB_REF_NAME
-          git push --tags
+          git push origin "refs/tags/$GITHUB_REF_NAME"
         working-directory: metadata
 
   pypi:
@@ -133,10 +152,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VER }}
-      - uses: sanjacob/pipenv-requirements@v1
-        with:
-          from-pipfile: true
-          dev: true
+      - name: Install dependencies from Pipfile
+        run: |
+          python -m pip install --upgrade pip pipenv
+          pipenv requirements --dev > requirements.txt
+          pip install -r requirements.txt
       - run: python -m build
       - uses: actions/upload-artifact@v4
         with:
@@ -145,11 +165,17 @@ jobs:
       - name: Deploy to PyPI
         if: startsWith(github.ref, 'refs/tags/')
         env:
-          TWINE_USERNAME: ${{ secrets.TWINE_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.TWINE_PASSWORD }}
-        run: twine upload dist/*
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN != '' && secrets.PYPI_API_TOKEN || secrets.TWINE_PASSWORD }}
+        run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "::error::Missing PyPI token. Configure PYPI_API_TOKEN (preferred) or TWINE_PASSWORD."
+            exit 1
+          fi
+          twine upload --non-interactive dist/*
 
   flatpak:
+    if: ${{ github.repository_owner == 'sanjacob' }}
     needs: [ test, package-metadata ]
     runs-on: ubuntu-latest
     env:
@@ -384,7 +410,7 @@ jobs:
     permissions:
       pull-requests: write
     env:
-      ACTION_RUNS: https://github.com/sanjacob/BlackboardSync/actions/runs/
+      ACTION_RUNS: ${{ github.server_url }}/${{ github.repository }}/actions/runs/
     steps:
       - uses: mshick/add-pr-comment@v2
         continue-on-error: true

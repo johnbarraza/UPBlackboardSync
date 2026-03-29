@@ -1,0 +1,41 @@
+name: Release Desktop + Extension Assets
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Desktop release tag (optional; if empty auto-generates next vX.Y.Z)"
+        required: false
+        default: ""
+        type: string
+      desktop_target:
+        description: "Desktop target to build"
+        required: true
+        default: windows
+        type: choice
+        options:
+          - windows
+          - mac
+          - both
+      prerelease:
+        description: "Mark release as pre-release"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    uses: ./.github/workflows/release-desktop.yml
+    with:
+      tag_name: ${{ inputs.tag_name }}
+      target: ${{ inputs.desktop_target }}
+      prerelease: ${{ inputs.prerelease }}
+
+  extension-assets:
+    needs: [desktop]
+    uses: ./.github/workflows/release-extension-assets.yml
+    with:
+      tag_name: ${{ needs.desktop.outputs.resolved_tag }}
