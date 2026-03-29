@@ -4,8 +4,9 @@ on:
   workflow_call:
     inputs:
       tag_name:
-        description: "Tag for the release (example: ext-v0.1.0)"
-        required: true
+        description: "Tag for the release (optional; if empty auto-generates next ext-vX.Y.Z)"
+        required: false
+        default: ""
         type: string
   push:
     tags:
@@ -13,8 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Tag for the release (example: ext-v0.1.0)"
-        required: true
+        description: "Tag for the release (optional; if empty auto-generates next ext-vX.Y.Z)"
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -25,17 +27,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Resolve tag name
         id: vars
         run: |
+          TAG=""
           if [ "${{ github.event_name }}" = "workflow_call" ]; then
-            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+            TAG="${{ inputs.tag_name }}"
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+            TAG="${{ inputs.tag_name }}"
           else
-            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            TAG="${GITHUB_REF_NAME}"
           fi
+
+          if [ -z "$TAG" ]; then
+            latest="$(git tag -l --sort=-v:refname "ext-v*" | grep -E '^ext-v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
+            if [ -z "$latest" ]; then
+              TAG="ext-v0.1.0"
+            else
+              clean="${latest#ext-v}"
+              IFS='.' read -r major minor patch <<< "$clean"
+              major="${major:-0}"
+              minor="${minor:-1}"
+              patch="${patch:-0}"
+              patch=$((patch + 1))
+              TAG="ext-v${major}.${minor}.${patch}"
+            fi
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Validate tag prefix
         run: |
