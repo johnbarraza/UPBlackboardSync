@@ -10,8 +10,8 @@ Licencia: GPL-2.0 (se mantiene la licencia del proyecto original).
 
 Este proyecto publica dos tipos de archivos:
 
-- Aplicacion de escritorio (desktop).
-- Extension de navegador para Chrome y Firefox.
+- Aplicacion de escritorio (desktop) usa el API de blackboard (más preciso).
+- Extension de navegador para Chrome y Firefox (scrape la pagina, es más proclive a errores).
 
 [![CI][build-shield]][actions]
 [![GitHub Downloads][downloads-shield]][releases]
