@@ -63,7 +63,7 @@ class UIManager(QObject):
         # adopts the dark system palette and renders light text on the light
         # wizard/settings pages, leaving them blank.
         style_hints = self.app.styleHints()
-        if hasattr(style_hints, "setColorScheme"):
+        if style_hints is not None and hasattr(style_hints, "setColorScheme"):
             style_hints.setColorScheme(Qt.ColorScheme.Light)
         self.app.setApplicationName(title)
         self.app.setQuitOnLastWindowClosed(False)

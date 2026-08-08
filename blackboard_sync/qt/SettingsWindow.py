@@ -60,6 +60,7 @@ class SettingsWindow(QWidget):
         self.backup_location_hint: QLabel
 
         # Drive widgets
+        self.drive_label: QLabel
         self.enable_drive: QCheckBox
         self.select_credentials: QPushButton
         self.drive_auth_button: QPushButton
@@ -104,7 +105,7 @@ class SettingsWindow(QWidget):
             self._apply_drive_coming_soon()
 
     def _apply_drive_coming_soon(self) -> None:
-        """Lock the Google Drive section as a disabled 'coming soon' feature."""
+        """Disable the Google Drive section and mark it as coming soon."""
         self.drive_label.setText(
             self.tr("Google Drive Integration (coming soon)")
         )
