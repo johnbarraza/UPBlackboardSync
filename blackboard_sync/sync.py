@@ -47,8 +47,6 @@ logger = logging.getLogger(__name__)
 class BlackboardSync:
     """Represents an instance of the BlackboardSync application."""
 
-    _log_directory = "log"
-
     # Seconds between each check of time elapsed since last sync
     _check_sleep_time = 10
 
@@ -60,6 +58,7 @@ class BlackboardSync:
         
         # Drive Service
         self._drive_service: DriveService | None = None
+        self._log_handler: logging.Handler | None = None
 
         # Time between each sync in seconds
         self._sync_interval = 60 * 30
@@ -100,8 +99,7 @@ class BlackboardSync:
         if self._config.last_sync_time is not None:
             self.schedule_next_sync(self._config.last_sync_time)
 
-        if self.download_location is not None:
-            self._add_logger_file_handler()
+        self._add_logger_file_handler()
 
     def setup(self, university_index: int, download_location: Path,
               min_year: int | None = None) -> None:
@@ -320,21 +318,28 @@ class BlackboardSync:
 
     def _add_logger_file_handler(self) -> None:
         filename = f"sync_log_{datetime.now():%Y-%m-%d}.log"
-
-        if self.download_location is None:
-            return
-
-        log_dir = self.download_location / self._log_directory
+        log_dir = self._config.log_directory
         log_dir.mkdir(exist_ok=True, parents=True)
 
         log_path = log_dir / filename
 
-        logger = logging.getLogger(__name__)
+        app_logger = logging.getLogger(__package__ or "blackboard_sync")
 
         file_handler = logging.FileHandler(log_path)
         file_handler.setLevel(logging.WARNING)
+        file_handler._blackboardsync_log_path = log_path
 
-        logger.addHandler(file_handler)
+        if self._log_handler is not None:
+            app_logger.removeHandler(self._log_handler)
+            self._log_handler.close()
+
+        for handler in app_logger.handlers:
+            if getattr(handler, "_blackboardsync_log_path", None) == log_path:
+                self._log_handler = handler
+                return
+
+        app_logger.addHandler(file_handler)
+        self._log_handler = file_handler
 
     def force_sync(self) -> None:
         """Force Sync thread to start download job ASAP."""
@@ -410,7 +415,6 @@ class BlackboardSync:
     def download_location(self, value: Path) -> None:
         if value != self.download_location:
             self._config.download_location = value
-            self._add_logger_file_handler()
 
     @property
     def backup_location(self) -> Path | None:

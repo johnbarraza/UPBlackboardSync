@@ -58,6 +58,13 @@ class UIManager(QObject):
         self.signals = self.Signals()
 
         self.app = QApplication(sys.argv)
+        # The UI is designed for a light theme; force a light color scheme so
+        # text stays readable under Windows dark mode. Otherwise Qt (>=6.8)
+        # adopts the dark system palette and renders light text on the light
+        # wizard/settings pages, leaving them blank.
+        style_hints = self.app.styleHints()
+        if hasattr(style_hints, "setColorScheme"):
+            style_hints.setColorScheme(Qt.ColorScheme.Light)
         self.app.setApplicationName(title)
         self.app.setQuitOnLastWindowClosed(False)
         self.load_translator()

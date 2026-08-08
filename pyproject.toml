@@ -20,8 +20,8 @@ classifiers = [
     "Topic :: Education"
 ]
 dependencies = [
-    "pyqt6>=6.7.1",
-    "pyqt6-webengine>=6.7.0",
+    "pyqt6>=6.11.0",
+    "pyqt6-webengine>=6.11.0",
     "beautifulsoup4>=4.12.2",
     "pydantic>=2.1.1",
     "pathvalidate>=3.1.0",
@@ -46,8 +46,8 @@ package = ["pyinstaller>=5.13.2", "build", "twine"]
 
 [project.urls]
 "Homepage" = "https://bbsync.app"
-"Repository" = "https://github.com/sanjacob/BlackboardSync"
-"Bug Tracker" = "https://github.com/sanjacob/BlackboardSync/issues"
+"Repository" = "https://github.com/johnbarraza/UPBlackboardSync"
+"Bug Tracker" = "https://github.com/johnbarraza/UPBlackboardSync/issues"
 
 [tool.setuptools_scm]
 

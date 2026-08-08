@@ -250,6 +250,14 @@ class TestSettingsWindow:
         assert blocker.signal_triggered
 
 
+class TestLoginWebView:
+    def test_shutdown_before_load(self, qtbot):
+        login = LoginWebView("")
+        qtbot.addWidget(login)
+
+        login.shutdown()
+
+
 class TestSyncTrayIcon:
     def test_tray_icon_initial_state(self, qtbot, tray_icon):
         assert tray_icon._menu._status.text() == 'Not logged in'

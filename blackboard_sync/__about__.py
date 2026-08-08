@@ -37,7 +37,7 @@ __id__ = "app.bbsync.BlackboardSync"
 __title__ = "Blackboard Sync"
 
 __summary__ = "Automatic Syncing Of Your Blackboard Content"
-__uri__ = "https://github.com/sanjacob/BlackboardSync"
+__uri__ = "https://github.com/johnbarraza/UPBlackboardSync"
 __homepage__ = "https://bbsync.app"
 
 __author__ = "Jacob Sánchez"

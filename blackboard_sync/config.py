@@ -30,8 +30,6 @@ from collections.abc import Callable
 
 from appdirs import user_config_dir
 
-from .__about__ import __author__
-
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +53,7 @@ class Config(configparser.ConfigParser):
 
     def save(self) -> None:
         """Save the current configuration to disk."""
+        self._config_file.parent.mkdir(parents=True, exist_ok=True)
         with self._config_file.open('w') as config_file:
             self.write(config_file)
 
@@ -72,9 +71,14 @@ class Config(configparser.ConfigParser):
 class SyncConfig(Config):
     """Configuration manager for BlackboardSync."""
     _config_filename = "blackboard_sync"
+    _app_dir_name = "BlackboardSync"
 
     def __init__(self, custom_dir=None):
-        default_dir = Path(user_config_dir(appauthor=__author__, roaming=True))
+        default_dir = Path(user_config_dir(
+            appname=self._app_dir_name,
+            appauthor=False,
+            roaming=True,
+        ))
 
         config_dir = custom_dir or default_dir
         super().__init__(config_dir / self._config_filename,
@@ -186,6 +190,16 @@ class SyncConfig(Config):
     def drive_token_path(self) -> Path:
         """Path where file token.json is stored (next to config file)."""
         return self._config_file.parent / 'token.json'
+
+    @property
+    def data_directory(self) -> Path:
+        """Directory where app-owned config, token, and logs are stored."""
+        return self._config_file.parent
+
+    @property
+    def log_directory(self) -> Path:
+        """Directory where diagnostic logs are stored."""
+        return self.data_directory / 'logs'
 
     @property
     def selected_course_ids(self) -> list[str]:

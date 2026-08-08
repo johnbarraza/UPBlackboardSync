@@ -210,3 +210,19 @@ other/
 sync/
 /.planning
 /.claude
+
+# Google Drive OAuth secrets / tokens (NEVER commit)
+credentials.json
+client_secret*.json
+token.json
+
+# Local debug output / scraped course data (private)
+debug_repor*.json
+courses.json
+https___*.html
+*_announcements.html
+.tests/
+
+# Local scratch / build render output
+_ignore/
+replaced/

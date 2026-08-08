@@ -48,7 +48,7 @@ class LoginWebView(QWidget):
         self.help_button: QPushButton
         self.status: QLabel
 
-        self.watchdog: Timer | None
+        self.watchdog: Timer | None = None
 
         self.start_url: str | None = None
         self.target_url: str | None = None

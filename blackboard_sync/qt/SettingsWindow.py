@@ -71,6 +71,9 @@ class SettingsWindow(QWidget):
 
         self.signals = self.Signals()
         self._data_source = ""
+        # Google Drive integration is not shipping yet; presented as
+        # "coming soon" and kept fully disabled so no OAuth flow can run.
+        self._drive_coming_soon = True
         self._credentials_path: Path | None = None
         self._available_courses: list[dict[str, str]] = []
         self._selected_course_ids: list[str] = []
@@ -96,6 +99,25 @@ class SettingsWindow(QWidget):
         self.log_out_button.clicked.connect(self.signals.log_out)
         self.setup_button.clicked.connect(self.signals.setup_wiz)
         self.button_box.accepted.connect(self.signals.save)
+
+        if self._drive_coming_soon:
+            self._apply_drive_coming_soon()
+
+    def _apply_drive_coming_soon(self) -> None:
+        """Lock the Google Drive section as a disabled 'coming soon' feature."""
+        self.drive_label.setText(
+            self.tr("Google Drive Integration (coming soon)")
+        )
+        self.enable_drive.setChecked(False)
+        self.enable_drive.setEnabled(False)
+        self.select_credentials.setEnabled(False)
+        self.drive_auth_button.setEnabled(False)
+        self.drive_status_label.setText(self.tr("Coming soon"))
+
+        tip = self.tr("Google Drive sync is coming soon.")
+        for widget in (self.enable_drive, self.select_credentials,
+                       self.drive_auth_button, self.drive_status_label):
+            widget.setToolTip(tip)
 
     @pyqtSlot()
     def _choose_location(self) -> None:
@@ -140,10 +162,14 @@ class SettingsWindow(QWidget):
 
     @property
     def drive_enabled(self) -> bool:
+        if self._drive_coming_soon:
+            return False
         return self.enable_drive.isChecked()
 
     @drive_enabled.setter
     def drive_enabled(self, enabled: bool) -> None:
+        if self._drive_coming_soon:
+            return
         self.enable_drive.setChecked(enabled)
         self._toggle_drive(enabled)
 
@@ -156,6 +182,9 @@ class SettingsWindow(QWidget):
         self._credentials_path = path
 
     def set_drive_status(self, email: str | None) -> None:
+        if self._drive_coming_soon:
+            self.drive_status_label.setText(self.tr("Coming soon"))
+            return
         if email:
             self.drive_status_label.setText(f"Connected as {email}")
         else:

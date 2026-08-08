@@ -24,6 +24,8 @@ from packaging import version
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as get_version
 
+from .__about__ import __uri__
+
 
 def check_for_updates() -> bool:
     """Checks if there is a newer release than the current on Github."""
@@ -34,15 +36,19 @@ def check_for_updates() -> bool:
     except PackageNotFoundError:
         return False
 
-    domain = "https://api.github.com"
-    url = f"{domain}/repos/sanjacob/BlackboardSync/releases/latest"
+    repo = __uri__.removeprefix("https://github.com/")
+    url = f"https://api.github.com/repos/{repo}/releases/latest"
 
-    response = requests.get(url, timeout=2000)
+    try:
+        response = requests.get(url, timeout=20)
+        response.raise_for_status()
+        tag = response.json()['tag_name']
+    except (requests.RequestException, KeyError, ValueError):
+        return False
 
-    if response.status_code == 200:
-        json_response = response.json()
-        tag = json_response['tag_name']
-        tag = tag[1:] if tag[0] == 'v' else tag
-
+    tag = tag[1:] if tag.startswith('v') else tag
+    try:
         return version.parse(tag) > version.parse(__version__)
+    except version.InvalidVersion:
+        return False
     return False
