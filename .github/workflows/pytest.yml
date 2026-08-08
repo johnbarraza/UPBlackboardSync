@@ -39,4 +39,9 @@ jobs:
           mypy --strict blackboard_sync/qt
 
       - name: Run test suite
+        env:
+          # QtWebEngine (Chromium) segfaults on teardown under headless CI
+          # unless the sandbox and GPU are disabled.
+          QTWEBENGINE_DISABLE_SANDBOX: "1"
+          QTWEBENGINE_CHROMIUM_FLAGS: "--no-sandbox --disable-gpu --disable-software-rasterizer --disable-dev-shm-usage"
         run: pytest -vvvv
