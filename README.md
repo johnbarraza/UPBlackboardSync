@@ -29,3 +29,11 @@ Este proyecto publica dos tipos de archivos:
 [stars-shield]: https://img.shields.io/github/stars/johnbarraza/UPBlackboardSync?style=social
 [stars]: https://github.com/johnbarraza/UPBlackboardSync/stargazers
 
+## Control remoto via MCP
+
+La app incluye un servidor MCP embebido (puerto `39571`) que arranca automaticamente al abrir BlackboardSync. Permite que Claude u otras herramientas de IA monitoreen y controlen la app remotamente.
+
+Se puede desactivar desde **Preferencias → Remote Control (MCP)**.
+
+[Ver documentacion completa del MCP →](docs/mcp.md)
+
