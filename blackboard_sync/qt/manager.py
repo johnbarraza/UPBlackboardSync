@@ -39,7 +39,8 @@ class UIManager(QObject):
         open_menu = pyqtSignal()
         open_downloads = pyqtSignal()
         setup = pyqtSignal(int, Path, int)
-        config = pyqtSignal(Path, int, bool, object, bool, object, object, bool)
+        config = pyqtSignal(
+            Path, int, bool, object, bool, object, object, bool)
         force_sync = pyqtSignal()
         auth_drive = pyqtSignal(object)
         log_out = pyqtSignal()
