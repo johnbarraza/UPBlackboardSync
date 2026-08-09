@@ -26,6 +26,7 @@ import logging
 import threading
 import shutil
 from pathlib import Path
+from collections.abc import Callable
 from requests import RequestException
 from datetime import datetime, timezone, timedelta
 
@@ -76,6 +77,9 @@ class BlackboardSync:
         self._is_active = False
         # Flag to know if download thread has errors
         self._has_error = False
+
+        # Called (from sync thread) when session expires unexpectedly
+        self._auth_required_callback: Callable[[], None] | None = None
 
         logger.debug("Initialising BlackboardSync")
 
@@ -181,6 +185,8 @@ class BlackboardSync:
             logger.warning("Session expired - please log in again from the application")
             logger.info("Your session may have expired because you logged in from another location (browser, mobile app, etc.)")
             self.log_out()
+            if self._auth_required_callback is not None:
+                self._auth_required_callback()
         except (RequestException) as e:
             logger.warning(f"Network error during sync: {type(e).__name__}")
             logger.info("The sync will be retried automatically on the next scheduled sync")

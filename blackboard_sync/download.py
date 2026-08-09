@@ -72,6 +72,7 @@ class BlackboardDownload:
         self._course_synced_callback = course_synced_callback
         self.executor = SyncExecutor()
         self.cancelled = False
+        self.current_course: str | None = None
 
         if last_downloaded is not None:
             self._last_downloaded = last_downloaded
@@ -107,6 +108,7 @@ class BlackboardDownload:
             if self.cancelled:
                 break
 
+            self.current_course = course.title or course.name or course.id
             logger.info(f"Fetching user course <{course.id}>")
 
             # When using course selection, a never-synced course should download

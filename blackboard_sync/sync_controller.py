@@ -29,6 +29,7 @@ from .institutions import get_names, autodetect
 
 from .updates import check_for_updates
 from .qt.manager import UIManager
+from .mcp_server import MCPBridge, MCPServer
 
 
 class SyncController:
@@ -40,6 +41,24 @@ class SyncController:
         self.ui = UIManager(__id__, __title__, __uri__,
                             get_names(), autodetect())
 
+        # Tracks whether session expired and re-login is needed
+        self._auth_required = False
+        self.model._auth_required_callback = self._on_auth_required
+
+        # MCP bridge dispatches HTTP-thread signals to Qt main thread
+        self._mcp_bridge = MCPBridge()
+        self._mcp_bridge.force_sync_requested.connect(self.force_sync)
+        self._mcp_bridge.open_login_requested.connect(self._mcp_open_login)
+        self._mcp_bridge.restart_sync_requested.connect(self._restart_sync)
+
+        self._mcp_server = MCPServer(
+            get_status=self._mcp_get_status,
+            get_courses=self._mcp_get_courses,
+            get_files=self._mcp_get_files,
+            bridge=self._mcp_bridge,
+        )
+        self._mcp_server.start()
+
         first_time = self.model.university is None
         self._pending_setup_course_selection = first_time
 
@@ -48,6 +67,114 @@ class SyncController:
 
         self.init_signals()
         self.ui.start(first_time)
+
+    # ── MCP helpers ────────────────────────────────────────────────────────
+
+    def _on_auth_required(self) -> None:
+        """Called from sync thread when session expires unexpectedly."""
+        self._auth_required = True
+
+    def _mcp_open_login(self) -> None:
+        if self.model.university is not None:
+            self.open_login()
+
+    def _restart_sync(self) -> None:
+        if self.model.is_active:
+            self.model.stop_sync()
+        if self.model.is_logged_in:
+            self.model.start_sync()
+
+    def _mcp_get_status(self) -> dict:
+        last = self.model.last_sync_time
+        nxt = self.model.next_sync
+        loc = self.model.download_location
+
+        _dl = self.model._download
+        current_course = _dl.current_course if (self.model.is_syncing and _dl is not None) else None
+
+        disk_mb: float | None = None
+        files_count: int | None = None
+        if loc and loc.exists():
+            try:
+                files = [f for f in loc.rglob("*") if f.is_file()]
+                files_count = len(files)
+                disk_mb = round(sum(f.stat().st_size for f in files) / (1024 * 1024), 1)
+            except Exception:
+                pass
+
+        return {
+            "logged_in": self.model.is_logged_in,
+            "syncing": self.model.is_syncing,
+            "active": self.model.is_active,
+            "auth_required": self._auth_required,
+            "current_course": current_course,
+            "last_sync": last.isoformat() if last else None,
+            "next_sync": nxt.isoformat() if nxt else None,
+            "download_location": str(loc) if loc else None,
+            "disk_usage_mb": disk_mb,
+            "files_count": files_count,
+            "university": self.model.university.name if self.model.university else None,
+        }
+
+    def _mcp_get_courses(self) -> list:
+        raw_courses = self.model.list_available_courses()
+        sync_status = self.model.course_sync_status
+        selected_ids = set(self.model.selected_course_ids)
+        sync_all = len(selected_ids) == 0
+
+        courses = []
+        for course in raw_courses:
+            cid = course.id
+            t = sync_status.get(cid)
+            year = course.created.year if course.created else None
+            selected = sync_all or (cid in selected_ids)
+
+            if selected:
+                status = "selected"
+            elif cid not in sync_status:
+                status = "new"
+            else:
+                status = "not_selected"
+
+            courses.append({
+                "id": cid,
+                "name": course.title or course.name or cid,
+                "year": year,
+                "selected": selected,
+                "sync_status": status,
+                "last_synced": t.isoformat() if t else None,
+            })
+
+        return courses
+
+    def _mcp_get_files(self, subpath: str = "") -> list:
+        from datetime import datetime
+        loc = self.model.download_location
+        if not loc:
+            return []
+        target = (loc / subpath).resolve() if subpath else loc.resolve()
+        if not str(target).startswith(str(loc.resolve())):
+            return []  # block path traversal
+        if not target.exists() or not target.is_dir():
+            return []
+        entries = []
+        try:
+            for entry in sorted(target.iterdir(), key=lambda e: (e.is_file(), e.name.lower())):
+                try:
+                    stat = entry.stat()
+                    entries.append({
+                        "name": entry.name,
+                        "type": "file" if entry.is_file() else "dir",
+                        "size_kb": round(stat.st_size / 1024, 1) if entry.is_file() else None,
+                        "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    })
+                except OSError:
+                    pass
+        except PermissionError:
+            pass
+        return entries
+
+    # ── signals ────────────────────────────────────────────────────────────
 
     def init_signals(self):
         self.ui.signals.open_settings.connect(self.open_settings)
@@ -139,6 +266,7 @@ class SyncController:
 
     def log_in(self, cookies: RequestsCookieJar) -> None:
         if self.model.auth(cookies, start_sync=False):
+            self._auth_required = False
             if self._pending_setup_course_selection:
                 courses = self.model.list_available_courses_summary()
                 selected = self.ui.ask_course_selection(
@@ -166,6 +294,7 @@ class SyncController:
     def quit(self) -> None:
         if self.model.is_active:
             self.model.stop_sync()
+        self._mcp_server.stop()
 
     def check_for_updates(self) -> None:
         if check_for_updates():
