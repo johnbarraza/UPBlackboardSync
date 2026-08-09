@@ -441,6 +441,14 @@ class BlackboardSync:
         self._config.backup_enabled = value
 
     @property
+    def mcp_enabled(self) -> bool:
+        return self._config.mcp_enabled
+
+    @mcp_enabled.setter
+    def mcp_enabled(self, value: bool) -> None:
+        self._config.mcp_enabled = value
+
+    @property
     def drive_enabled(self) -> bool:
          return self._config.drive_enabled
 

@@ -228,6 +228,15 @@ class SyncConfig(Config):
             self.remove_option('Sync', 'selected_course_ids')
 
     @property
+    def mcp_enabled(self) -> bool:
+        return self._sync.getboolean('mcp_enabled', fallback=True)
+
+    @mcp_enabled.setter
+    @Config.persist
+    def mcp_enabled(self, enabled: bool) -> None:
+        self._sync['mcp_enabled'] = str(enabled)
+
+    @property
     def course_sync_status(self) -> dict[str, datetime]:
         """Course id -> last successful sync timestamp."""
         raw = self._sync.get('course_sync_status')

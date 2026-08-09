@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for Atlantic Technical University Donegal (@mpmmtc)
 - Add support for Austin Community College (@arkysan)
 
+## [1.2.2] - 2026-08-09
+
+### Added
+- MCP server toggle in Settings — users can enable or disable remote control (default: enabled)
+- MCP server only starts on launch if the setting is enabled
+
 ## [1.2.1] - 2026-08-09
 
 ### Fixed

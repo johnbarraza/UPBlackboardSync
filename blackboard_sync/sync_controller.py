@@ -57,7 +57,8 @@ class SyncController:
             get_files=self._mcp_get_files,
             bridge=self._mcp_bridge,
         )
-        self._mcp_server.start()
+        if self.model.mcp_enabled:
+            self._mcp_server.start()
 
         first_time = self.model.university is None
         self._pending_setup_course_selection = first_time
@@ -220,7 +221,8 @@ class SyncController:
                               self.model.drive_email,
                               courses,
                               self.model.selected_course_ids,
-                              self.model.course_sync_status)
+                              self.model.course_sync_status,
+                              self.model.mcp_enabled)
 
     def open_menu(self) -> None:
         self.ui.open_menu(self.model.last_sync_time,
@@ -249,7 +251,7 @@ class SyncController:
     def config(self, download_location: str, sync_frequency: int,
                backup_enabled: bool, backup_location: str | None,
                drive_enabled: bool, drive_credentials_path: str | None,
-               selected_course_ids: list[str]) -> None:
+               selected_course_ids: list[str], mcp_enabled: bool = True) -> None:
         if self.model.download_location != download_location:
             self.model.download_location = download_location
             self.ui.ask_redownload()
@@ -260,6 +262,13 @@ class SyncController:
         self.model.drive_enabled = drive_enabled
         self.model.drive_credentials_path = drive_credentials_path
         self.model.selected_course_ids = selected_course_ids
+
+        if mcp_enabled != self.model.mcp_enabled:
+            self.model.mcp_enabled = mcp_enabled
+            if mcp_enabled:
+                self._mcp_server.start()
+            else:
+                self._mcp_server.stop()
 
     def redownload(self) -> None:
         self.model.redownload()

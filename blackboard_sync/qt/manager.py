@@ -39,7 +39,7 @@ class UIManager(QObject):
         open_menu = pyqtSignal()
         open_downloads = pyqtSignal()
         setup = pyqtSignal(int, Path, int)
-        config = pyqtSignal(Path, int, bool, object, bool, object, object)
+        config = pyqtSignal(Path, int, bool, object, bool, object, object, bool)
         force_sync = pyqtSignal()
         auth_drive = pyqtSignal(object)
         log_out = pyqtSignal()
@@ -195,7 +195,8 @@ class UIManager(QObject):
         self.signals.config.emit(sync_dir, self.config_window.sync_frequency,
                                  self.config_window.backup_enabled, backup_dir,
                                  self.config_window.drive_enabled, drive_creds,
-                                 self.config_window.selected_course_ids)
+                                 self.config_window.selected_course_ids,
+                                 self.config_window.mcp_enabled)
 
     @pyqtSlot()
     def slot_quit(self) -> None:
@@ -218,7 +219,8 @@ class UIManager(QObject):
                       drive_email: str | None,
                       courses: list[dict[str, str]],
                       selected_course_ids: list[str],
-                      course_sync_status: dict[str, datetime]) -> None:
+                      course_sync_status: dict[str, datetime],
+                      mcp_enabled: bool = True) -> None:
         self.config_window.download_location = download_location
         self.config_window.username = username
         self.config_window.sync_frequency = sync_interval
@@ -228,6 +230,7 @@ class UIManager(QObject):
         self.config_window.drive_enabled = drive_enabled
         self.config_window.drive_credentials_path = drive_creds
         self.config_window.set_drive_status(drive_email)
+        self.config_window.mcp_enabled = mcp_enabled
         self.config_window.set_courses(
             courses,
             selected_course_ids,

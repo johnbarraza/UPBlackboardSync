@@ -408,6 +408,67 @@
        </widget>
       </item>
       <item>
+       <spacer name="verticalSpacer_mcp">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="mcp_label">
+        <property name="font">
+         <font>
+          <family>Open Sans</family>
+          <pointsize>11</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Remote Control (MCP)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="enable_mcp">
+        <property name="font">
+         <font>
+          <family>Open Sans</family>
+          <pointsize>11</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Enable MCP server (port 39571)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="mcp_hint">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="font">
+         <font>
+          <family>Open Sans</family>
+          <pointsize>9</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Lets Claude and other AI tools monitor and control the app remotely.</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
        <spacer name="verticalSpacer">
        <property name="orientation">
         <enum>Qt::Vertical</enum>

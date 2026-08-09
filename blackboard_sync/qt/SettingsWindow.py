@@ -70,6 +70,10 @@ class SettingsWindow(QWidget):
         self.select_courses_button: QPushButton
         self.selected_courses_hint: QLabel
 
+        # MCP widgets
+        self.enable_mcp: QCheckBox
+        self.mcp_hint: QLabel
+
         self.signals = self.Signals()
         self._data_source = ""
         # Google Drive integration is not shipping yet; presented as
@@ -91,6 +95,7 @@ class SettingsWindow(QWidget):
             self._choose_backup_location
         )
         self.enable_backup.toggled.connect(self._toggle_backup)
+        self.enable_mcp.toggled.connect(self._toggle_mcp)
         self.select_credentials.clicked.connect(self._choose_credentials)
         self.drive_auth_button.clicked.connect(self.signals.auth_drive)
         self.enable_drive.toggled.connect(self._toggle_drive)
@@ -139,6 +144,10 @@ class SettingsWindow(QWidget):
         self.backup_location_hint.setEnabled(checked)
 
     @pyqtSlot(bool)
+    def _toggle_mcp(self, checked: bool) -> None:
+        self.mcp_hint.setEnabled(checked)
+
+    @pyqtSlot(bool)
     def _toggle_drive(self, checked: bool) -> None:
         self.select_credentials.setEnabled(checked)
         self.drive_auth_button.setEnabled(checked)
@@ -160,6 +169,15 @@ class SettingsWindow(QWidget):
         if dialog.exec():
             self._selected_course_ids = dialog.selected_course_ids
             self._update_course_selection_hint()
+
+    @property
+    def mcp_enabled(self) -> bool:
+        return self.enable_mcp.isChecked()
+
+    @mcp_enabled.setter
+    def mcp_enabled(self, enabled: bool) -> None:
+        self.enable_mcp.setChecked(enabled)
+        self._toggle_mcp(enabled)
 
     @property
     def drive_enabled(self) -> bool:
