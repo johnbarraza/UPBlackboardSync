@@ -16,6 +16,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for Atlantic Technical University Donegal (@mpmmtc)
 - Add support for Austin Community College (@arkysan)
 
+## [1.2.1] - 2026-08-09
+
+### Fixed
+- `current_course` attribute access uses `getattr` to support mock objects in tests
+
+## [1.2.0] - 2026-08-09
+
+### Added
+- Embedded MCP/REST HTTP server (`0.0.0.0:39571`) starts automatically with the app
+- MCP streamable-HTTP transport (spec `2024-11-05`) — compatible with Claude, Hermes, OpenClaw, and any MCP agent
+- Tools: `blackboard_status`, `blackboard_courses`, `blackboard_files`, `blackboard_sync_now`, `blackboard_open_login`, `blackboard_restart`, `blackboard_auth_required`
+- Plain REST endpoints: `GET /status`, `GET /courses`, `GET /files`, `GET /health`, `POST /sync`, `POST /login`, `POST /restart`
+- Port override via `BBSYNC_MCP_PORT` environment variable
+- Documentation: `docs/mcp.md` — connection guide, tool reference, REST API, Hermes polling strategy
+
+## [1.1.0] - 2026-07-01
+
+### Added
+- Drive backup integration (coming soon UI placeholder)
+- Course-level sync tracking with per-course last-synced timestamps
+- Course selection persists and forces full re-download when local files are missing
+
+### Fixed
+- Light theme icon rendering
+- Strict mypy and flake8 compliance in Qt modules
+
 ## [0.18.0] - 2024-10-22
 
 ### Added
