@@ -108,7 +108,7 @@ class BlackboardDownload:
             if self.cancelled:
                 break
 
-            self.current_course = course.title or course.name or course.id
+            self.current_course = getattr(course, 'title', None) or getattr(course, 'name', None) or course.id
             logger.info(f"Fetching user course <{course.id}>")
 
             # When using course selection, a never-synced course should download
