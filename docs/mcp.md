@@ -39,6 +39,7 @@ Full snapshot of the app state. Good for polling every 30–60 s.
 
 ```json
 {
+  "version": "1.3.1",
   "logged_in": true,
   "syncing": true,
   "active": true,

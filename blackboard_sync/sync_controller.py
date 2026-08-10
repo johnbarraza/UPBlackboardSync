@@ -106,6 +106,7 @@ class SyncController:
                 pass
 
         return {
+            "version": _HARDCODED_VERSION,
             "logged_in": self.model.is_logged_in,
             "syncing": self.model.is_syncing,
             "active": self.model.is_active,
