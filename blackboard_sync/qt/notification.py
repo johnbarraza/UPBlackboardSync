@@ -54,7 +54,7 @@ class TrayMessages(QObject):
         self.messages = {
             Event.UPDATE_AVAILABLE: SyncTrayMsg(
                 self.tr('An update is available'),
-                self.tr('You can update the app from your digital store'),
+                self.tr('Download the latest version from GitHub Releases'),
                 Severity.INFORMATION.value, Duration.SHORT
             ),
             Event.DOWNLOAD_ERROR: SyncTrayMsg(

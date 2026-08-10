@@ -31,7 +31,10 @@ __all__ = [
     "__license__",
     "__license_spdx__",
     "__copyright__",
+    "__version__",
 ]
+
+__version__ = "1.3.0"
 
 __id__ = "app.bbsync.BlackboardSync"
 __title__ = "Blackboard Sync"

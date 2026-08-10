@@ -21,20 +21,12 @@ Checks for updates in GitHub.
 
 import requests
 from packaging import version
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as get_version
 
-from .__about__ import __uri__
+from .__about__ import __uri__, __version__
 
 
 def check_for_updates() -> bool:
     """Checks if there is a newer release than the current on Github."""
-    package = __package__.replace('_', '')
-
-    try:
-        __version__ = get_version(package)
-    except PackageNotFoundError:
-        return False
 
     repo = __uri__.removeprefix("https://github.com/")
     url = f"https://api.github.com/repos/{repo}/releases/latest"

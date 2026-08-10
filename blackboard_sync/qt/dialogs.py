@@ -241,17 +241,26 @@ class DiagnosticsDialog(QDialog):
 
     def _refresh(self) -> None:
         try:
+            from blackboard_sync.__about__ import __version__
+        except Exception:
+            __version__ = "?"
+        try:
             s = self._get_status()
+            logged_in = s.get('logged_in')
+            conn = "Connected" if logged_in else "Disconnected"
+            syncing = "Yes" if s.get('syncing') else "No"
+            auth_req = "Yes (re-login needed)" if s.get('auth_required') else "No"
             lines = [
-                f"logged_in    : {s.get('logged_in')}",
-                f"syncing      : {s.get('syncing')}",
-                f"auth_required: {s.get('auth_required')}",
+                f"version      : {__version__}",
+                f"status       : {conn}",
+                f"syncing now  : {syncing}",
+                f"auth_required: {auth_req}",
                 f"last_sync    : {s.get('last_sync') or '—'}",
                 f"next_sync    : {s.get('next_sync') or '—'}",
                 f"files        : {s.get('files_count', '?')}  |  disk: {s.get('disk_usage_mb', '?')} MB",
                 f"university   : {s.get('university', '?')}",
                 f"location     : {s.get('download_location', '?')}",
-                f"log dir      : {self._log_path or '—'}",
+                f"log file     : {self._log_path or '—'}",
             ]
             self._stats_label.setText("\n".join(lines))
         except Exception:
