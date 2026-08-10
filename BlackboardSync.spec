@@ -49,40 +49,62 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-exe = EXE(
-    pyz,
-    a.scripts,
-    [],
-    exclude_binaries=True,
-    name='BlackboardSync',
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=[get_icon()],
-)
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='BlackboardSync',
-)
-
-app = BUNDLE(
-    coll,
-    name="BlackboardSync.app",
-    icon='blackboard_sync/assets/logo.png',
-    bundle_indentifier='app.bbsync.BlackboardSync',
-    info_plist={
-        'LSUIElement': True
-    },
-)
+if platform.system() == 'Windows':
+    # Single-file exe on Windows
+    exe = EXE(
+        pyz,
+        a.scripts,
+        a.binaries,
+        a.datas,
+        [],
+        name='BlackboardSync',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=[get_icon()],
+    )
+else:
+    # macOS: folder + app bundle
+    exe = EXE(
+        pyz,
+        a.scripts,
+        [],
+        exclude_binaries=True,
+        name='BlackboardSync',
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=True,
+        console=False,
+        disable_windowed_traceback=False,
+        argv_emulation=False,
+        target_arch=None,
+        codesign_identity=None,
+        entitlements_file=None,
+        icon=[get_icon()],
+    )
+    coll = COLLECT(
+        exe,
+        a.binaries,
+        a.datas,
+        strip=False,
+        upx=True,
+        upx_exclude=[],
+        name='BlackboardSync',
+    )
+    app = BUNDLE(
+        coll,
+        name="BlackboardSync.app",
+        icon='blackboard_sync/assets/logo.png',
+        bundle_indentifier='app.bbsync.BlackboardSync',
+        info_plist={
+            'LSUIElement': True
+        },
+    )
