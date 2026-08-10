@@ -150,6 +150,7 @@ class SyncController:
             is_syncing_now = (current_course == title)
 
             file_count = 0
+            course_path = None
             if loc:
                 year_str = str(year) if year else "No Date"
                 course_path = loc / year_str / title
@@ -170,6 +171,7 @@ class SyncController:
                 "is_syncing_now": is_syncing_now,
                 "has_local_files": file_count > 0,
                 "local_file_count": file_count,
+                "local_path": str(course_path) if course_path else None,
             })
 
         return courses
