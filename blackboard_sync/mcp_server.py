@@ -79,6 +79,41 @@ _TOOLS: list[dict] = [
         ),
         "inputSchema": {"type": "object", "properties": {}},
     },
+    {
+        "name": "blackboard_announcements",
+        "description": (
+            "Fetch course announcements from Blackboard. "
+            "Pass course_id to get announcements for a specific course, "
+            "or omit to get recent announcements from all enrolled courses."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "course_id": {
+                    "type": "string",
+                    "description": "Blackboard course ID (e.g. '_12345_1'). Omit to fetch from all courses.",
+                }
+            },
+        },
+    },
+    {
+        "name": "blackboard_course_status",
+        "description": (
+            "Get detailed status for a specific course by its ID: "
+            "name, year, selected for sync, last_synced, local file count, "
+            "local path, and count of announcements available."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "course_id": {
+                    "type": "string",
+                    "description": "Blackboard course ID (e.g. '_12345_1').",
+                }
+            },
+            "required": ["course_id"],
+        },
+    },
 ]
 
 
@@ -102,6 +137,8 @@ class _Handler(BaseHTTPRequestHandler):
     get_status: Callable[[], dict]
     get_courses: Callable[[], list]
     get_files: Callable[[str], list]
+    get_announcements: Callable[[str | None], list]
+    get_course_status: Callable[[str], dict]
     bridge: MCPBridge
 
     def log_message(self, fmt: str, *args: Any) -> None:
@@ -223,6 +260,14 @@ class _Handler(BaseHTTPRequestHandler):
                     "Call blackboard_open_login to show the login window on the PC."
                 )
             return text("✅ Logged in — no action needed.")
+        elif name == "blackboard_announcements":
+            course_id = args.get("course_id") or None
+            announcements = self.get_announcements(course_id)
+            return text(json.dumps(announcements, default=str, indent=2))
+        elif name == "blackboard_course_status":
+            course_id = args.get("course_id", "")
+            status = self.get_course_status(course_id)
+            return text(json.dumps(status, default=str, indent=2))
         else:
             return {
                 "isError": True,
@@ -242,6 +287,8 @@ class MCPServer:
         get_status: Callable[[], dict],
         get_courses: Callable[[], list],
         get_files: Callable[[str], list],
+        get_announcements: Callable[[str | None], list],
+        get_course_status: Callable[[str], dict],
         bridge: MCPBridge,
         port: int | None = None,
     ) -> None:
@@ -253,6 +300,8 @@ class MCPServer:
                 "get_status": staticmethod(get_status),
                 "get_courses": staticmethod(get_courses),
                 "get_files": staticmethod(get_files),
+                "get_announcements": staticmethod(get_announcements),
+                "get_course_status": staticmethod(get_course_status),
                 "bridge": bridge,
             },
         )

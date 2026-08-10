@@ -332,7 +332,7 @@ class BlackboardSync:
         app_logger = logging.getLogger(__package__ or "blackboard_sync")
 
         file_handler = logging.FileHandler(log_path)
-        file_handler.setLevel(logging.WARNING)
+        file_handler.setLevel(logging.INFO)
         file_handler._blackboardsync_log_path = log_path
 
         if self._log_handler is not None:

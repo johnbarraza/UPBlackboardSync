@@ -161,6 +161,62 @@ unusually long time without progress.
 
 ---
 
+### `blackboard_announcements`
+Fetch course announcements live from Blackboard. Each announcement is also written to disk as a `.md` file during sync (see below).
+
+**Arguments:**
+- `course_id` *(optional)* — Blackboard course ID (e.g. `"_12345_1"`). Omit to fetch from all enrolled courses.
+
+```json
+[
+  {
+    "id": "_999_1",
+    "title": "Bienvenidos",
+    "body": "<p>...</p>",
+    "created": "2026-08-07T14:00:00.000Z",
+    "modified": "2026-08-07T14:00:00.000Z",
+    "course_id": "_77249_1"
+  }
+]
+```
+
+> Makes one Blackboard API call per course. Use sparingly.
+
+**On-disk format:** during every sync, announcements are written to:
+```
+<download_location>/<year>/<course>/Announcements/YYYY-MM-DD - Title.md
+```
+Each file contains the title, timestamp, and HTML-stripped body. Existing files are never overwritten.
+
+---
+
+### `blackboard_course_status`
+Detailed status for a single course. Faster than `blackboard_courses` when you only need one.
+
+**Arguments:**
+- `course_id` *(required)*
+
+```json
+{
+  "id": "_77249_1",
+  "name": "Economia Conductual",
+  "year": 2026,
+  "selected_for_sync": true,
+  "last_synced": "2026-08-10T07:15:00+00:00",
+  "local_file_count": 12,
+  "local_announcement_count": 1,
+  "local_path": "C:/Users/john/Blackboard/2026/Economia Conductual-A-PRE-...",
+  "live_announcement_count": 1
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `local_announcement_count` | `.md` files in the `Announcements/` subfolder on disk |
+| `live_announcement_count` | Announcements fetched live from Blackboard API right now |
+
+---
+
 ## REST API (no MCP client needed)
 
 All endpoints also work as plain HTTP for quick debugging or scripts:

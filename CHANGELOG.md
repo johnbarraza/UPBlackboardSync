@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Course announcements sync** — each sync writes one `.md` per announcement into `Announcements/` subfolder per course. Filename: `YYYY-MM-DD - Title.md`. Existing files are never overwritten.
+- **MCP tool `blackboard_announcements`** — fetch live announcements for one or all courses via MCP.
+- **MCP tool `blackboard_course_status`** — detailed per-course status: name, sync state, file count, announcement count.
+- **Nerd Stats dialog** — "Nerd Stats / Logs" button in Settings opens a dialog with live sync stats, log file path, and a refreshable log viewer (manual + auto-refresh every 5s).
+
+### Changed
+- Sync log level lowered from `WARNING` to `INFO` so the Nerd Stats log viewer has meaningful content.
+- `docs/mcp.md` updated with the two new MCP tools.
+
+### Added
 - Add support for Universidad Pablo de Olavide (@davidsollodp)
 - Add support for University of Maryland, Baltimore County (@ghost)
 - Add support for Syracuse University (@363843342)

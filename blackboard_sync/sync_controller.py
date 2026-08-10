@@ -29,6 +29,7 @@ from .institutions import get_names, autodetect
 
 from .updates import check_for_updates
 from .qt.manager import UIManager
+from .qt.dialogs import DiagnosticsDialog
 from .mcp_server import MCPBridge, MCPServer
 
 
@@ -55,6 +56,8 @@ class SyncController:
             get_status=self._mcp_get_status,
             get_courses=self._mcp_get_courses,
             get_files=self._mcp_get_files,
+            get_announcements=self._mcp_get_announcements,
+            get_course_status=self._mcp_get_course_status,
             bridge=self._mcp_bridge,
             port=self.model.mcp_port,
         )
@@ -203,10 +206,96 @@ class SyncController:
             pass
         return entries
 
+    def _mcp_get_announcements(self, course_id: str | None = None) -> list:
+        sess = self.model.sess
+        if sess is None:
+            return []
+        try:
+            if course_id:
+                course_ids = [course_id]
+            else:
+                courses = self.model.list_available_courses()
+                course_ids = [c.id for c in courses]
+            all_announcements = []
+            for cid in course_ids:
+                try:
+                    result = sess.fetch_course_announcements(course_id=cid)
+                    if isinstance(result, dict):
+                        items = result.get("results", [])
+                    elif isinstance(result, list):
+                        items = result
+                    else:
+                        items = []
+                    for item in items:
+                        item["course_id"] = cid
+                        all_announcements.append(item)
+                except Exception:
+                    pass
+            return all_announcements
+        except Exception:
+            logger.exception("Error fetching announcements")
+            return []
+
+    def _open_diagnostics(self) -> None:
+        log_dir = self.model._config.log_directory
+        from datetime import datetime as _dt
+        log_path = log_dir / f"sync_log_{_dt.now():%Y-%m-%d}.log"
+        dlg = DiagnosticsDialog(
+            get_status=self._mcp_get_status,
+            log_path=log_path,
+            parent=self.ui.config_window,
+        )
+        dlg.exec()
+
+    def _mcp_get_course_status(self, course_id: str) -> dict:
+        courses = self.model.list_available_courses()
+        course = next((c for c in courses if c.id == course_id), None)
+        if course is None:
+            return {"error": f"Course {course_id!r} not found"}
+
+        sync_status = self.model.course_sync_status
+        selected_ids = set(self.model.selected_course_ids)
+        sync_all = len(selected_ids) == 0
+        loc = self.model.download_location
+
+        t = sync_status.get(course_id)
+        year = course.created.year if course.created else None
+        title = course.title or course.name or course_id
+        selected = sync_all or (course_id in selected_ids)
+
+        file_count = 0
+        ann_count = 0
+        course_path = None
+        if loc:
+            year_str = str(year) if year else "No Date"
+            course_path = loc / year_str / title
+            try:
+                file_count = sum(1 for p in course_path.rglob("*") if p.is_file())
+                ann_folder = course_path / "Announcements"
+                if ann_folder.exists():
+                    ann_count = sum(1 for p in ann_folder.iterdir() if p.is_file())
+            except (OSError, PermissionError):
+                pass
+
+        announcements = self._mcp_get_announcements(course_id)
+
+        return {
+            "id": course_id,
+            "name": title,
+            "year": year,
+            "selected_for_sync": selected,
+            "last_synced": t.isoformat() if t else None,
+            "local_file_count": file_count,
+            "local_announcement_count": ann_count,
+            "local_path": str(course_path) if course_path else None,
+            "live_announcement_count": len(announcements),
+        }
+
     # ── signals ────────────────────────────────────────────────────────────
 
     def init_signals(self):
         self.ui.signals.open_settings.connect(self.open_settings)
+        self.ui.config_window.signals.open_diagnostics.connect(self._open_diagnostics)
         self.ui.signals.open_tray.connect(self.open_tray)
         self.ui.signals.open_downloads.connect(self.open_downloads)
         self.ui.signals.open_menu.connect(self.open_menu)
@@ -303,6 +392,8 @@ class SyncController:
                 get_status=self._mcp_get_status,
                 get_courses=self._mcp_get_courses,
                 get_files=self._mcp_get_files,
+                get_announcements=self._mcp_get_announcements,
+                get_course_status=self._mcp_get_course_status,
                 bridge=self._mcp_bridge,
                 port=mcp_port,
             )

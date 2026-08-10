@@ -18,8 +18,10 @@
 import webbrowser
 from pathlib import Path
 from datetime import datetime
+from typing import Callable
 
-from PyQt6.QtCore import QObject, Qt
+from PyQt6.QtCore import QObject, Qt, QTimer
+from PyQt6.QtGui import QFont, QTextCursor
 from PyQt6.QtWidgets import (
     QMessageBox,
     QFileDialog,
@@ -32,6 +34,9 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QHBoxLayout,
     QWidget,
+    QPlainTextEdit,
+    QCheckBox,
+    QFrame,
 )
 
 from .assets import logo
@@ -163,6 +168,107 @@ class CourseSelectionDialog(QDialog):
             )
             return
         self.accept()
+
+
+class DiagnosticsDialog(QDialog):
+    """Nerd stats: sync status + live-refreshable log viewer."""
+
+    def __init__(self,
+                 get_status: Callable[[], dict],
+                 log_path: Path | None,
+                 parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Nerd Stats")
+        self.setWindowIcon(logo())
+        self.resize(720, 520)
+
+        self._get_status = get_status
+        self._log_path = log_path
+
+        # ── stats ──────────────────────────────────────────────────────────
+        stats_header = QLabel("Sync status")
+        stats_header.setStyleSheet("font-weight: bold;")
+
+        self._stats_label = QLabel()
+        self._stats_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self._stats_label.setFont(QFont("Courier New", 9))
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+
+        # ── log viewer ─────────────────────────────────────────────────────
+        log_header = QLabel("Log")
+        log_header.setStyleSheet("font-weight: bold;")
+
+        self._log_view = QPlainTextEdit()
+        self._log_view.setReadOnly(True)
+        self._log_view.setFont(QFont("Courier New", 8))
+
+        # ── buttons ────────────────────────────────────────────────────────
+        self._auto_cb = QCheckBox("Auto-refresh (5 s)")
+        self._timer = QTimer(self)
+        self._timer.setInterval(5000)
+        self._timer.timeout.connect(self._refresh)
+        self._auto_cb.toggled.connect(
+            lambda on: self._timer.start() if on else self._timer.stop()
+        )
+
+        refresh_btn = QPushButton("Refresh")
+        refresh_btn.clicked.connect(self._refresh)
+
+        close_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        close_box.rejected.connect(self.reject)
+
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(refresh_btn)
+        btn_row.addWidget(self._auto_cb)
+        btn_row.addStretch()
+        btn_row.addWidget(close_box)
+
+        layout = QVBoxLayout()
+        layout.addWidget(stats_header)
+        layout.addWidget(self._stats_label)
+        layout.addWidget(sep)
+        layout.addWidget(log_header)
+        layout.addWidget(self._log_view, stretch=1)
+        layout.addLayout(btn_row)
+        self.setLayout(layout)
+
+        self._refresh()
+
+    def _refresh(self) -> None:
+        try:
+            s = self._get_status()
+            lines = [
+                f"logged_in    : {s.get('logged_in')}",
+                f"syncing      : {s.get('syncing')}",
+                f"auth_required: {s.get('auth_required')}",
+                f"last_sync    : {s.get('last_sync') or '—'}",
+                f"next_sync    : {s.get('next_sync') or '—'}",
+                f"files        : {s.get('files_count', '?')}  |  disk: {s.get('disk_usage_mb', '?')} MB",
+                f"university   : {s.get('university', '?')}",
+                f"location     : {s.get('download_location', '?')}",
+                f"log dir      : {self._log_path or '—'}",
+            ]
+            self._stats_label.setText("\n".join(lines))
+        except Exception:
+            pass
+
+        try:
+            p = self._log_path
+            if p and p.exists():
+                text = p.read_text(encoding="utf-8", errors="replace").strip()
+                self._log_view.setPlainText(text or "(log is empty)")
+            else:
+                self._log_view.setPlainText("(no log file found)")
+            cursor = self._log_view.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self._log_view.setTextCursor(cursor)
+        except Exception as exc:
+            self._log_view.setPlainText(f"Error reading log: {exc}")
 
 
 class Dialogs(QObject):

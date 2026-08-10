@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from blackboard.blackboard import BBCourse
 
 from .api_path import BBContentPath
+from .announcement import Announcement
 from .job import DownloadJob
 from .content import Content
 
@@ -32,6 +33,23 @@ class Course:
                                      content_id=content.id)
             self.children.append(Content(content, api_path, job))
 
+        self.announcements = self._fetch_announcements(course.id, job)
+
+    @staticmethod
+    def _fetch_announcements(course_id: str, job: DownloadJob) -> list[Announcement]:
+        try:
+            result = job.session.fetch_course_announcements(course_id=course_id)
+            if isinstance(result, dict):
+                items = result.get("results", [])
+            elif isinstance(result, list):
+                items = result
+            else:
+                return []
+            return [Announcement(item) for item in items]
+        except Exception:
+            logger.debug("Could not fetch announcements for %s", course_id)
+            return []
+
     def write(self, path: Path, executor: ThreadPoolExecutor) -> None:
         if self.ignore:
             return
@@ -40,6 +58,11 @@ class Course:
 
         for child in self.children:
             child.write(path, executor)
+
+        if self.announcements:
+            ann_folder = path / "Announcements"
+            for ann in self.announcements:
+                ann.write(ann_folder)
 
     @staticmethod
     def get_year(created: datetime | None) -> str:

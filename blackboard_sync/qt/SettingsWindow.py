@@ -41,6 +41,7 @@ class SettingsWindow(QWidget):
         setup_wiz = pyqtSignal()
         save = pyqtSignal()
         auth_drive = pyqtSignal()
+        open_diagnostics = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -53,6 +54,7 @@ class SettingsWindow(QWidget):
         self.select_download_location: QPushButton
         self.log_out_button: QPushButton
         self.setup_button: QPushButton
+        self.nerd_stats_button: QPushButton
         self.button_box: QDialogButtonBox
 
         # Backup widgets
@@ -107,6 +109,7 @@ class SettingsWindow(QWidget):
         # Signals
         self.log_out_button.clicked.connect(self.signals.log_out)
         self.setup_button.clicked.connect(self.signals.setup_wiz)
+        self.nerd_stats_button.clicked.connect(self.signals.open_diagnostics)
         self.button_box.accepted.connect(self.signals.save)
 
         if self._drive_coming_soon:
