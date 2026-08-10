@@ -123,12 +123,21 @@ class SyncController:
         sync_status = self.model.course_sync_status
         selected_ids = set(self.model.selected_course_ids)
         sync_all = len(selected_ids) == 0
+        loc = self.model.download_location
+
+        _dl = self.model._download
+        current_course = (
+            _dl.current_course
+            if (self.model.is_syncing and _dl is not None)
+            else None
+        )
 
         courses = []
         for course in raw_courses:
             cid = course.id
             t = sync_status.get(cid)
             year = course.created.year if course.created else None
+            title = course.title or course.name or cid
             selected = sync_all or (cid in selected_ids)
 
             if selected:
@@ -138,13 +147,29 @@ class SyncController:
             else:
                 status = "not_selected"
 
+            is_syncing_now = (current_course == title)
+
+            file_count = 0
+            if loc:
+                year_str = str(year) if year else "No Date"
+                course_path = loc / year_str / title
+                try:
+                    file_count = sum(
+                        1 for p in course_path.rglob("*") if p.is_file()
+                    )
+                except (OSError, PermissionError):
+                    pass
+
             courses.append({
                 "id": cid,
-                "name": course.title or course.name or cid,
+                "name": title,
                 "year": year,
                 "selected": selected,
                 "sync_status": status,
                 "last_synced": t.isoformat() if t else None,
+                "is_syncing_now": is_syncing_now,
+                "has_local_files": file_count > 0,
+                "local_file_count": file_count,
             })
 
         return courses

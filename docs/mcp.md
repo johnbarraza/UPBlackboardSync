@@ -70,15 +70,21 @@ sparingly (once at startup, then on demand).
     "year": 2026,
     "selected": true,
     "sync_status": "selected",
-    "last_synced": "2026-08-09T14:30:00+00:00"
+    "last_synced": "2026-08-09T14:30:00+00:00",
+    "is_syncing_now": true,
+    "has_local_files": true,
+    "local_file_count": 47
   },
   {
     "id": "_99999_1",
     "name": "Física II",
     "year": 2026,
-    "selected": false,
-    "sync_status": "new",
-    "last_synced": null
+    "selected": true,
+    "sync_status": "selected",
+    "last_synced": null,
+    "is_syncing_now": false,
+    "has_local_files": false,
+    "local_file_count": 0
   }
 ]
 ```
@@ -90,6 +96,22 @@ sparingly (once at startup, then on demand).
 | `selected` | User chose to sync this course — downloading |
 | `not_selected` | User deselected it — skipped |
 | `new` | Newly enrolled, never seen — **not downloading yet** |
+
+Per-course sync state fields:
+
+| Field | Meaning |
+|---|---|
+| `is_syncing_now` | This course is being downloaded at this moment |
+| `has_local_files` | At least one file exists on disk for this course |
+| `local_file_count` | Number of files on disk (0 = never synced or empty) |
+
+**Reading sync state per course:**
+- `selected + last_synced: null + has_local_files: false` → **needs full sync** (never downloaded)
+- `selected + last_synced: <date> + has_local_files: true` → **up to date**
+- `is_syncing_now: true` → **downloading right now**
+- `selected + has_local_files: false + last_synced: <date>` → **local files missing**, will re-download next sync
+
+> Note: `local_file_count` scans the course folder on every call. Avoid calling faster than every 30 s when many courses are selected.
 
 > **Tip:** Hermes can detect `sync_status: "new"` courses and notify you so you can
 > open Settings → select the course → it starts syncing.
