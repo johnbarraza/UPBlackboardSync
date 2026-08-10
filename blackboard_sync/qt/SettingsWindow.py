@@ -42,6 +42,7 @@ class SettingsWindow(QWidget):
         save = pyqtSignal()
         auth_drive = pyqtSignal()
         open_diagnostics = pyqtSignal()
+        reconnect = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -55,6 +56,7 @@ class SettingsWindow(QWidget):
         self.log_out_button: QPushButton
         self.setup_button: QPushButton
         self.nerd_stats_button: QPushButton
+        self.reconnect_button: QPushButton
         self.button_box: QDialogButtonBox
 
         # Backup widgets
@@ -110,6 +112,7 @@ class SettingsWindow(QWidget):
         self.log_out_button.clicked.connect(self.signals.log_out)
         self.setup_button.clicked.connect(self.signals.setup_wiz)
         self.nerd_stats_button.clicked.connect(self.signals.open_diagnostics)
+        self.reconnect_button.clicked.connect(self.signals.reconnect)
         self.button_box.accepted.connect(self.signals.save)
 
         if self._drive_coming_soon:
@@ -282,6 +285,9 @@ class SettingsWindow(QWidget):
         else:
             self.current_session_label.setText(
                 self.tr("Not currently logged in"))
+
+    def set_connection_status(self, logged_in: bool) -> None:
+        self.reconnect_button.setVisible(not logged_in)
 
     @property
     def version(self) -> str | None:

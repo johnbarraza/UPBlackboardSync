@@ -215,6 +215,7 @@ class DiagnosticsDialog(QDialog):
         self._auto_cb.toggled.connect(
             lambda on: self._timer.start() if on else self._timer.stop()
         )
+        self._auto_cb.setChecked(True)
 
         refresh_btn = QPushButton("Refresh")
         refresh_btn.clicked.connect(self._refresh)

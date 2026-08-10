@@ -47,6 +47,7 @@ class UIManager(QObject):
         log_in = pyqtSignal(RequestsCookieJar)
         redownload = pyqtSignal()
         quit = pyqtSignal()
+        reconnect = pyqtSignal()
 
     def __init__(self, id: str, title: str, uri: str,
                  universities: list[str], autodetected: int | None) -> None:
@@ -96,6 +97,7 @@ class UIManager(QObject):
         self.config_window.signals.log_out.connect(self.slot_log_out)
         self.config_window.signals.setup_wiz.connect(self.slot_open_setup)
         self.config_window.signals.auth_drive.connect(self.slot_auth_drive)
+        self.config_window.signals.reconnect.connect(self.slot_reconnect)
 
         self.tray.signals.force_sync.connect(self.signals.force_sync)
         self.tray.signals.show_menu.connect(self.signals.open_menu)
@@ -201,6 +203,11 @@ class UIManager(QObject):
                                  self.config_window.mcp_port)
 
     @pyqtSlot()
+    def slot_reconnect(self) -> None:
+        self.hide(self.config_window)
+        self.signals.reconnect.emit()
+
+    @pyqtSlot()
     def slot_quit(self) -> None:
         self.login_window.shutdown()
         self.app.quit()
@@ -223,7 +230,8 @@ class UIManager(QObject):
                       selected_course_ids: list[str],
                       course_sync_status: dict[str, datetime],
                       mcp_enabled: bool = False,
-                      mcp_port: int = 39571) -> None:
+                      mcp_port: int = 39571,
+                      logged_in: bool = True) -> None:
         self.config_window.download_location = download_location
         self.config_window.username = username
         self.config_window.sync_frequency = sync_interval
@@ -240,6 +248,7 @@ class UIManager(QObject):
             selected_course_ids,
             course_sync_status
         )
+        self.config_window.set_connection_status(logged_in)
         self.show(self.config_window)
 
     def ask_course_selection(self,

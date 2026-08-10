@@ -306,6 +306,7 @@ class SyncController:
         self.ui.signals.log_out.connect(self.log_out)
         self.ui.signals.quit.connect(self.quit)
         self.ui.signals.auth_drive.connect(self.auth_drive)
+        self.ui.signals.reconnect.connect(self.open_login)
 
     def open_login(self) -> None:
         start_url = str(self.model.university.login.start_url)
@@ -333,7 +334,8 @@ class SyncController:
                               self.model.selected_course_ids,
                               self.model.course_sync_status,
                               self.model.mcp_enabled,
-                              self.model.mcp_port)
+                              self.model.mcp_port,
+                              self.model.is_logged_in)
 
     def open_menu(self) -> None:
         self.ui.open_menu(self.model.last_sync_time,
