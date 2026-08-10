@@ -21,7 +21,8 @@ from datetime import datetime
 
 from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject
 from PyQt6.QtWidgets import QWidget, QLabel
-from PyQt6.QtWidgets import QComboBox, QPushButton, QDialogButtonBox, QCheckBox
+from PyQt6.QtWidgets import (QComboBox, QPushButton, QDialogButtonBox,
+                             QCheckBox, QSpinBox)
 
 from .assets import load_ui
 from .dialogs import DirDialog, FileDialog, CourseSelectionDialog
@@ -72,6 +73,8 @@ class SettingsWindow(QWidget):
 
         # MCP widgets
         self.enable_mcp: QCheckBox
+        self.mcp_port_input: QSpinBox
+        self.mcp_port_label: QLabel
         self.mcp_hint: QLabel
 
         self.signals = self.Signals()
@@ -145,6 +148,8 @@ class SettingsWindow(QWidget):
 
     @pyqtSlot(bool)
     def _toggle_mcp(self, checked: bool) -> None:
+        self.mcp_port_label.setEnabled(checked)
+        self.mcp_port_input.setEnabled(checked)
         self.mcp_hint.setEnabled(checked)
 
     @pyqtSlot(bool)
@@ -178,6 +183,14 @@ class SettingsWindow(QWidget):
     def mcp_enabled(self, enabled: bool) -> None:
         self.enable_mcp.setChecked(enabled)
         self._toggle_mcp(enabled)
+
+    @property
+    def mcp_port(self) -> int:
+        return self.mcp_port_input.value()
+
+    @mcp_port.setter
+    def mcp_port(self, port: int) -> None:
+        self.mcp_port_input.setValue(port)
 
     @property
     def drive_enabled(self) -> bool:

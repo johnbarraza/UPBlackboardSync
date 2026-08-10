@@ -229,12 +229,21 @@ class SyncConfig(Config):
 
     @property
     def mcp_enabled(self) -> bool:
-        return self._sync.getboolean('mcp_enabled', fallback=True)
+        return self._sync.getboolean('mcp_enabled', fallback=False)
 
     @mcp_enabled.setter
     @Config.persist
     def mcp_enabled(self, enabled: bool) -> None:
         self._sync['mcp_enabled'] = str(enabled)
+
+    @property
+    def mcp_port(self) -> int:
+        return self._sync.getint('mcp_port', fallback=39571)
+
+    @mcp_port.setter
+    @Config.persist
+    def mcp_port(self, port: int) -> None:
+        self._sync['mcp_port'] = str(port)
 
     @property
     def course_sync_status(self) -> dict[str, datetime]:

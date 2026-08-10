@@ -56,6 +56,7 @@ class SyncController:
             get_courses=self._mcp_get_courses,
             get_files=self._mcp_get_files,
             bridge=self._mcp_bridge,
+            port=self.model.mcp_port,
         )
         if self.model.mcp_enabled:
             self._mcp_server.start()
@@ -222,7 +223,8 @@ class SyncController:
                               courses,
                               self.model.selected_course_ids,
                               self.model.course_sync_status,
-                              self.model.mcp_enabled)
+                              self.model.mcp_enabled,
+                              self.model.mcp_port)
 
     def open_menu(self) -> None:
         self.ui.open_menu(self.model.last_sync_time,
@@ -251,7 +253,8 @@ class SyncController:
     def config(self, download_location: str, sync_frequency: int,
                backup_enabled: bool, backup_location: str | None,
                drive_enabled: bool, drive_credentials_path: str | None,
-               selected_course_ids: list[str], mcp_enabled: bool = True) -> None:
+               selected_course_ids: list[str], mcp_enabled: bool = False,
+               mcp_port: int = 39571) -> None:
         if self.model.download_location != download_location:
             self.model.download_location = download_location
             self.ui.ask_redownload()
@@ -263,12 +266,21 @@ class SyncController:
         self.model.drive_credentials_path = drive_credentials_path
         self.model.selected_course_ids = selected_course_ids
 
-        if mcp_enabled != self.model.mcp_enabled:
+        mcp_changed = (mcp_enabled != self.model.mcp_enabled
+                       or mcp_port != self.model.mcp_port)
+        if mcp_changed:
+            self._mcp_server.stop()
             self.model.mcp_enabled = mcp_enabled
+            self.model.mcp_port = mcp_port
+            self._mcp_server = MCPServer(
+                get_status=self._mcp_get_status,
+                get_courses=self._mcp_get_courses,
+                get_files=self._mcp_get_files,
+                bridge=self._mcp_bridge,
+                port=mcp_port,
+            )
             if mcp_enabled:
                 self._mcp_server.start()
-            else:
-                self._mcp_server.stop()
 
     def redownload(self) -> None:
         self.model.redownload()
