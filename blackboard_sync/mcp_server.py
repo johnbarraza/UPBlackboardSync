@@ -114,6 +114,24 @@ _TOOLS: list[dict] = [
             "required": ["course_id"],
         },
     },
+    {
+        "name": "blackboard_roster",
+        "description": (
+            "Get the list of enrolled members for a course (name, role). "
+            "Returns whatever Blackboard permits — full roster for instructors, "
+            "may be limited for students depending on institution settings."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "course_id": {
+                    "type": "string",
+                    "description": "Blackboard course ID (e.g. '_12345_1').",
+                }
+            },
+            "required": ["course_id"],
+        },
+    },
 ]
 
 
@@ -139,6 +157,7 @@ class _Handler(BaseHTTPRequestHandler):
     get_files: Callable[[str], list]
     get_announcements: Callable[[str | None], list]
     get_course_status: Callable[[str], dict]
+    get_roster: Callable[[str], list]
     bridge: MCPBridge
 
     def log_message(self, fmt: str, *args: Any) -> None:
@@ -268,6 +287,10 @@ class _Handler(BaseHTTPRequestHandler):
             course_id = args.get("course_id", "")
             status = self.get_course_status(course_id)
             return text(json.dumps(status, default=str, indent=2))
+        elif name == "blackboard_roster":
+            course_id = args.get("course_id", "")
+            roster = self.get_roster(course_id)
+            return text(json.dumps(roster, default=str, indent=2))
         else:
             return {
                 "isError": True,
@@ -289,6 +312,7 @@ class MCPServer:
         get_files: Callable[[str], list],
         get_announcements: Callable[[str | None], list],
         get_course_status: Callable[[str], dict],
+        get_roster: Callable[[str], list],
         bridge: MCPBridge,
         port: int | None = None,
     ) -> None:
@@ -302,6 +326,7 @@ class MCPServer:
                 "get_files": staticmethod(get_files),
                 "get_announcements": staticmethod(get_announcements),
                 "get_course_status": staticmethod(get_course_status),
+                "get_roster": staticmethod(get_roster),
                 "bridge": bridge,
             },
         )

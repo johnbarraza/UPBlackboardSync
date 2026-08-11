@@ -56,6 +56,7 @@ class SyncController:
             get_files=self._mcp_get_files,
             get_announcements=self._mcp_get_announcements,
             get_course_status=self._mcp_get_course_status,
+            get_roster=self._mcp_get_roster,
             bridge=self._mcp_bridge,
             port=self.model.mcp_port,
         )
@@ -245,6 +246,36 @@ class SyncController:
             parent=self.ui.config_window,
         )
         dlg.exec()
+
+    def _mcp_get_roster(self, course_id: str) -> list:
+        sess = self.model.sess
+        if sess is None:
+            return []
+        try:
+            result = sess.fetch_course_memberships(course_id=course_id)
+            if isinstance(result, dict):
+                items = result.get("results", [result])
+            elif isinstance(result, list):
+                items = result
+            else:
+                items = []
+            members = []
+            for m in items:
+                user = m.get("user", {}) or {}
+                name_obj = user.get("name", {}) or {}
+                given = name_obj.get("given", "")
+                family = name_obj.get("family", "")
+                username = user.get("userName", "")
+                display = f"{given} {family}".strip() or username or m.get("userId", "")
+                members.append({
+                    "userId": m.get("userId"),
+                    "name": display,
+                    "userName": username,
+                    "role": m.get("courseRoleId"),
+                })
+            return members
+        except Exception:
+            return []
 
     def _mcp_get_course_status(self, course_id: str) -> dict:
         courses = self.model.list_available_courses()
