@@ -7,6 +7,7 @@ from blackboard.blackboard import BBCourse
 
 from .api_path import BBContentPath
 from .announcement import Announcement
+from .roster import Roster
 from .job import DownloadJob
 from .content import Content
 
@@ -34,6 +35,7 @@ class Course:
             self.children.append(Content(content, api_path, job))
 
         self.announcements = self._fetch_announcements(course.id, job)
+        self.roster = Roster.fetch(job.session, course.id)
 
     @staticmethod
     def _fetch_announcements(course_id: str, job: DownloadJob) -> list[Announcement]:
@@ -63,6 +65,8 @@ class Course:
             ann_folder = path / "Announcements"
             for ann in self.announcements:
                 ann.write(ann_folder)
+
+        self.roster.write(path / "Roster")
 
     @staticmethod
     def get_year(created: datetime | None) -> str:
