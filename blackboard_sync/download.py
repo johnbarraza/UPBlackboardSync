@@ -22,9 +22,11 @@ mass download all user content from Blackboard
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import json
 import logging
 from pathlib import Path
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timezone, timedelta
 from collections.abc import Callable
 
 from blackboard.api_extended import BlackboardExtended
@@ -36,6 +38,87 @@ from .content.course import Course
 
 
 logger = logging.getLogger(__name__)
+
+_ACTIVITY_WINDOW = timedelta(hours=4)
+
+
+def _write_activity_md(download_location: Path, start_time: datetime) -> None:
+    json_path = download_location / ".recent_activity.json"
+    md_path = download_location / "recent.md"
+    now = datetime.now(timezone.utc)
+    cutoff = now - _ACTIVITY_WINDOW
+    start_ts = start_time.timestamp()
+
+    existing: list[dict] = []
+    if json_path.exists():
+        try:
+            existing = json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            existing = []
+
+    new_entries: list[dict] = []
+    try:
+        for f in download_location.rglob("*"):
+            if not f.is_file():
+                continue
+            if f.name.startswith(".") or f.name == "recent.md":
+                continue
+            try:
+                st = f.stat()
+                if st.st_mtime >= start_ts:
+                    rel = f.relative_to(download_location)
+                    parts = rel.parts
+                    course = parts[1] if len(parts) >= 3 else (parts[0] if parts else "")
+                    new_entries.append({
+                        "path": str(rel),
+                        "name": f.name,
+                        "course": course,
+                        "size_kb": round(st.st_size / 1024, 1),
+                        "synced_at": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+                    })
+            except OSError:
+                pass
+    except Exception:
+        logger.warning("Could not scan for activity files")
+
+    seen = {e["path"] for e in new_entries}
+    cutoff_iso = cutoff.isoformat()
+    merged = new_entries + [
+        e for e in existing
+        if e.get("path") not in seen and e.get("synced_at", "") >= cutoff_iso
+    ]
+    merged.sort(key=lambda e: e.get("synced_at", ""), reverse=True)
+
+    try:
+        json_path.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+    by_course: dict[str, list] = defaultdict(list)
+    for e in merged:
+        by_course[e.get("course", "")].append(e)
+
+    ts = now.astimezone().strftime("%Y-%m-%d %H:%M")
+    lines = [
+        "# Recent Activity — BlackboardSync",
+        "",
+        f"*Updated {ts} · last 4 hours*",
+        "",
+    ]
+    if not merged:
+        lines += ["*No new files in the last 4 hours.*", ""]
+    else:
+        for course in sorted(by_course):
+            lines += [f"## {course or 'Other'}", ""]
+            for e in by_course[course]:
+                t = datetime.fromisoformat(e["synced_at"]).astimezone().strftime("%H:%M")
+                lines.append(f"- `{e['name']}` — {e['size_kb']} KB — {t}")
+            lines.append("")
+
+    try:
+        md_path.write_text("\n".join(lines), encoding="utf-8")
+    except Exception:
+        logger.warning("Could not write recent.md")
 
 
 class BlackboardDownload:
@@ -136,6 +219,8 @@ class BlackboardDownload:
 
         self.executor.shutdown(wait=True, cancel_futures=self.cancelled)
         failed_files = self.executor.raise_exceptions()
+
+        _write_activity_md(self.download_location, start_time)
 
         if failed_files > 0:
             logger.warning(

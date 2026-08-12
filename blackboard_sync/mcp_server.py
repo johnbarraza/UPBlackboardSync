@@ -115,6 +115,14 @@ _TOOLS: list[dict] = [
         },
     },
     {
+        "name": "blackboard_recent",
+        "description": (
+            "Get the list of files downloaded in the last 4 hours. "
+            "Returns entries with name, course, size_kb, and synced_at timestamp."
+        ),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
         "name": "blackboard_roster",
         "description": (
             "Get the list of enrolled members for a course (name, role). "
@@ -158,6 +166,7 @@ class _Handler(BaseHTTPRequestHandler):
     get_announcements: Callable[[str | None], list]
     get_course_status: Callable[[str], dict]
     get_roster: Callable[[str], list]
+    get_recent: Callable[[], list]
     bridge: MCPBridge
 
     def log_message(self, fmt: str, *args: Any) -> None:
@@ -291,6 +300,8 @@ class _Handler(BaseHTTPRequestHandler):
             course_id = args.get("course_id", "")
             roster = self.get_roster(course_id)
             return text(json.dumps(roster, default=str, indent=2))
+        elif name == "blackboard_recent":
+            return text(json.dumps(self.get_recent(), default=str, indent=2))
         else:
             return {
                 "isError": True,
@@ -313,6 +324,7 @@ class MCPServer:
         get_announcements: Callable[[str | None], list],
         get_course_status: Callable[[str], dict],
         get_roster: Callable[[str], list],
+        get_recent: Callable[[], list],
         bridge: MCPBridge,
         port: int | None = None,
     ) -> None:
@@ -327,6 +339,7 @@ class MCPServer:
                 "get_announcements": staticmethod(get_announcements),
                 "get_course_status": staticmethod(get_course_status),
                 "get_roster": staticmethod(get_roster),
+                "get_recent": staticmethod(get_recent),
                 "bridge": bridge,
             },
         )

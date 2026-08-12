@@ -57,6 +57,7 @@ class SyncController:
             get_announcements=self._mcp_get_announcements,
             get_course_status=self._mcp_get_course_status,
             get_roster=self._mcp_get_roster,
+            get_recent=self._mcp_get_recent,
             bridge=self._mcp_bridge,
             port=self.model.mcp_port,
         )
@@ -277,6 +278,19 @@ class SyncController:
         except Exception:
             return []
 
+    def _mcp_get_recent(self) -> list:
+        import json
+        loc = self.model.download_location
+        if not loc:
+            return []
+        json_path = loc / ".recent_activity.json"
+        if not json_path.exists():
+            return []
+        try:
+            return json.loads(json_path.read_text(encoding="utf-8"))
+        except Exception:
+            return []
+
     def _mcp_get_course_status(self, course_id: str) -> dict:
         courses = self.model.list_available_courses()
         course = next((c for c in courses if c.id == course_id), None)
@@ -420,6 +434,8 @@ class SyncController:
                 get_files=self._mcp_get_files,
                 get_announcements=self._mcp_get_announcements,
                 get_course_status=self._mcp_get_course_status,
+                get_roster=self._mcp_get_roster,
+                get_recent=self._mcp_get_recent,
                 bridge=self._mcp_bridge,
                 port=mcp_port,
             )
