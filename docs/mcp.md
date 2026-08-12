@@ -218,6 +218,42 @@ Detailed status for a single course. Faster than `blackboard_courses` when you o
 
 ---
 
+### `blackboard_roster`
+Get enrolled members for a course (name, username, role). Full list for instructors; may be limited for students depending on institution settings.
+
+**Arguments:**
+- `course_id` *(required)* — Blackboard course ID (e.g. `"_12345_1"`)
+
+```json
+[
+  { "userId": "_1001_1", "name": "García López, Ana", "userName": "ana.garcia", "role": "Student" },
+  { "userId": "_1002_1", "name": "Ramírez, Luis",    "userName": "luis.ramirez", "role": "Instructor" }
+]
+```
+
+> Also written to disk as `<download_location>/<year>/<course>/Roster/roster.md` during each sync.
+
+---
+
+### `blackboard_recent`
+Files downloaded in the last 4 hours across all syncs. No API call — reads the local `.recent_activity.json` written after each sync.
+
+```json
+[
+  {
+    "path": "2026\\Cálculo Diferencial\\Semana3\\parcial1.pdf",
+    "name": "parcial1.pdf",
+    "course": "Cálculo Diferencial",
+    "size_kb": 234.5,
+    "synced_at": "2026-08-12T15:29:00+00:00"
+  }
+]
+```
+
+> Use this instead of `blackboard_files` to quickly answer "what just synced?" without scanning the whole directory tree. Also written as a human-readable `recent.md` in the download folder root.
+
+---
+
 ## REST API (no MCP client needed)
 
 All endpoints also work as plain HTTP for quick debugging or scripts:
