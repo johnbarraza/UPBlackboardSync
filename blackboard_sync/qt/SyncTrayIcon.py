@@ -16,6 +16,7 @@
 # MA  02110-1301, USA.
 
 from datetime import datetime
+import webbrowser
 
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import pyqtSignal, QObject
@@ -24,6 +25,7 @@ from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 from .assets import logo, get_theme_icon, AppIcon
 from .utils import time_ago
 from .notification import Event, TrayMessages
+from blackboard_sync.__about__ import __title__, __uri__, __version__
 
 
 class SyncTrayMenu(QMenu):
@@ -32,6 +34,9 @@ class SyncTrayMenu(QMenu):
                  last_synced: datetime | None = None):
         super().__init__()
         self._last_synced: datetime | None = None
+        self._logged_in = logged_in
+        self._syncing = False
+        self._auth_required = False
 
         self._init_ui()
         self.set_last_synced(last_synced)
@@ -41,6 +46,10 @@ class SyncTrayMenu(QMenu):
         sync_icon = get_theme_icon(AppIcon.SYNC)
         close_icon = get_theme_icon(AppIcon.EXIT)
         open_dir_icon = get_theme_icon(AppIcon.OPEN)
+
+        self._status = QAction(self.tr("Status: not logged in"))
+        self.addAction(self._status)
+        self.addSeparator()
 
         self.refresh = QAction(self.tr("Sync now"))
         self.refresh.setIcon(sync_icon)
@@ -55,9 +64,10 @@ class SyncTrayMenu(QMenu):
 
         self.addSeparator()
 
-        self._status = QAction(self.tr("You haven't logged in"))
-        self._status.setEnabled(False)
-        self.addAction(self._status)
+        self.repository = QAction(f"{__title__} v{__version__} · GitHub")
+        self.repository.setToolTip(__uri__)
+        self.repository.triggered.connect(lambda: webbrowser.open(__uri__))
+        self.addAction(self.repository)
 
         self.reset_setup = QAction(self.tr("Setup"))
         self.addAction(self.reset_setup)
@@ -67,26 +77,41 @@ class SyncTrayMenu(QMenu):
         self.addAction(self.quit)
 
     def set_logged_in(self, logged_in: bool) -> None:
+        self._logged_in = logged_in
         self.refresh.setVisible(logged_in)
         self.preferences.setVisible(logged_in)
         self.reset_setup.setVisible(not logged_in)
         self.open_dir.setVisible(logged_in)
 
-        if logged_in:
-            self.set_last_synced(self._last_synced)
-        else:
-            self._status.setText(self.tr("Not logged in"))
+        self._update_status()
 
     def set_last_synced(self, last_synced: datetime | None) -> None:
         self._last_synced = last_synced
-        human_ago = time_ago(last_synced) if last_synced else "Never"
-        self._status.setText(self.tr("Last synced: ") + human_ago)
+        self._update_status()
 
     def set_currently_syncing(self, syncing: bool) -> None:
+        self._syncing = syncing
         self.refresh.setEnabled(not syncing)
+        self._update_status()
 
-        if syncing:
-            self._status.setText(self.tr("Downloading now..."))
+    def set_auth_required(self, auth_required: bool) -> None:
+        self._auth_required = auth_required
+        self._update_status()
+
+    def _update_status(self) -> None:
+        if self._auth_required:
+            text = self.tr("Status: login required — reconnect to Blackboard")
+        elif not self._logged_in:
+            text = self.tr("Status: not logged in")
+        elif self._syncing:
+            text = self.tr("Status: synchronizing now...")
+        elif self._last_synced:
+            text = self.tr("Status: connected · Last synced: ") + time_ago(
+                self._last_synced
+            )
+        else:
+            text = self.tr("Status: connected · Not synchronized yet")
+        self._status.setText(text)
 
 
 class SyncTrayIcon(QSystemTrayIcon):
@@ -135,6 +160,11 @@ class SyncTrayIcon(QSystemTrayIcon):
 
     def set_currently_syncing(self, syncing: bool) -> None:
         self._menu.set_currently_syncing(syncing)
+        self.setToolTip(self._menu._status.text())
+
+    def set_auth_required(self, auth_required: bool) -> None:
+        self._menu.set_auth_required(auth_required)
+        self.setToolTip(self._menu._status.text())
 
     def notify(self, evt: Event) -> None:
         title, msg, icon, duration = self._messages.get_msg(evt)

@@ -1,4 +1,6 @@
 from unittest import mock
+from datetime import datetime, timezone
+from types import SimpleNamespace
 
 from blackboard_sync.sync_controller import SyncController
 
@@ -21,6 +23,37 @@ def test_setup_marks_pending_course_selection():
     controller.model.setup.assert_called_once_with(2, "C:/Downloads", 2025)
     controller.open_login.assert_called_once()
     assert controller._pending_setup_course_selection is True
+
+
+def test_mcp_course_file_map_uses_year_and_course_folder(tmp_path):
+    controller = make_controller()
+    course = SimpleNamespace(
+        id="course-1",
+        title="Economia",
+        name="Economia",
+        created=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    controller.model.list_available_courses.return_value = [course]
+    controller.model.download_location = tmp_path
+    material = tmp_path / "2026" / "Economia" / "Semana 1" / "guia.pdf"
+    material.parent.mkdir(parents=True)
+    material.write_bytes(b"material")
+
+    result = SyncController._mcp_get_course_files(controller, "course-1")
+
+    assert result["local_path"] == str(tmp_path / "2026" / "Economia")
+    assert result["file_count"] == 1
+    assert result["files"][0]["path"] == str(
+        material.relative_to(tmp_path / "2026" / "Economia")
+    )
+
+
+def test_mcp_course_sync_is_one_time_request():
+    controller = make_controller()
+
+    SyncController._mcp_sync_course(controller, "course-1")
+
+    controller.model.force_sync.assert_called_once_with({"course-1"})
 
 
 def test_log_in_setup_flow_shows_course_selection_and_starts_sync():

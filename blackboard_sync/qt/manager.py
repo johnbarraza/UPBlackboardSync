@@ -267,10 +267,12 @@ class UIManager(QObject):
         return None
 
     def open_menu(self, last_sync: datetime,
-                  is_logged: bool, is_syncing: bool) -> None:
+                  is_logged: bool, is_syncing: bool,
+                  auth_required: bool = False) -> None:
         self.tray.set_last_synced(last_sync)
         self.tray.set_logged_in(is_logged)
         self.tray.set_currently_syncing(is_syncing)
+        self.tray.set_auth_required(auth_required)
 
     def open_tray(self, first_time: bool, is_logged: bool) -> None:
         if first_time:

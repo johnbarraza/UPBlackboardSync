@@ -260,7 +260,7 @@ class TestLoginWebView:
 
 class TestSyncTrayIcon:
     def test_tray_icon_initial_state(self, qtbot, tray_icon):
-        assert tray_icon._menu._status.text() == 'Not logged in'
+        assert tray_icon._menu._status.text() == 'Status: not logged in'
         assert not tray_icon._menu.refresh.isVisible()
         assert not tray_icon._menu.preferences.isVisible()
         assert tray_icon._menu._status.isVisible()
@@ -268,7 +268,7 @@ class TestSyncTrayIcon:
 
     def test_tray_icon_logged_in_state(self, qtbot, tray_icon):
         tray_icon.set_logged_in(True)
-        assert tray_icon._menu._status.text() != 'Not logged in'
+        assert 'connected' in tray_icon._menu._status.text()
         assert tray_icon._menu.refresh.isVisible()
         assert tray_icon._menu.refresh.isEnabled()
         assert tray_icon._menu.preferences.isVisible()
@@ -278,11 +278,17 @@ class TestSyncTrayIcon:
     def test_tray_icon_currently_syncing(self, qtbot, tray_icon):
         tray_icon.set_logged_in(True)
         tray_icon.set_currently_syncing(True)
-        assert tray_icon._menu._status.text() == 'Downloading now...'
+        assert tray_icon._menu._status.text() == 'Status: synchronizing now...'
         assert not tray_icon._menu.refresh.isEnabled()
 
         tray_icon.set_currently_syncing(False)
         assert tray_icon._menu.refresh.isEnabled()
+
+    def test_tray_icon_auth_required_state(self, qtbot, tray_icon):
+        tray_icon.set_logged_in(False)
+        tray_icon.set_auth_required(True)
+
+        assert 'login required' in tray_icon._menu._status.text()
 
     def test_tray_icon_setupwiz_signal(self, qtbot, tray_icon):
         with qtbot.waitSignal(tray_icon.signals.reset_setup) as blocker:
@@ -314,4 +320,5 @@ class TestSyncTrayIcon:
         exampleDate = datetime(year=1970, month=1, day=10, tzinfo=timezone.utc)
         tray_icon.set_last_synced(exampleDate)
         assert tray_icon._menu._last_synced == exampleDate
+        tray_icon.set_logged_in(True)
         assert 'years' in tray_icon._menu._status.text()

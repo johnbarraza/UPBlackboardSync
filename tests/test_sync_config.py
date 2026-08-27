@@ -37,6 +37,16 @@ def test_config_default_values():
         assert s.last_sync_time is None
 
 
+def test_mcp_is_enabled_by_default_and_can_be_disabled(tmp_path):
+    config = SyncConfig(tmp_path)
+
+    assert config.mcp_enabled is True
+
+    config.mcp_enabled = False
+
+    assert SyncConfig(tmp_path).mcp_enabled is False
+
+
 def test_config_save_creates_missing_directory():
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir) / "missing"
@@ -80,6 +90,36 @@ def test_sync_log_handler_uses_app_log_directory(tmp_path):
 
     logging.getLogger("blackboard_sync").removeHandler(sync._log_handler)
     sync._log_handler.close()
+
+
+def test_sync_exposes_active_log_path(tmp_path):
+    config = SyncConfig(tmp_path / "config")
+    sync = BlackboardSync.__new__(BlackboardSync)
+    sync._config = config
+    sync._log_handler = None
+
+    BlackboardSync._add_logger_file_handler(sync)
+
+    assert sync.log_path is not None
+    assert sync.log_path.parent == config.log_directory
+
+    logging.getLogger("blackboard_sync").removeHandler(sync._log_handler)
+    sync._log_handler.close()
+
+
+def test_force_sync_can_target_one_run_without_changing_config(tmp_path):
+    config = SyncConfig(tmp_path / "config")
+    config.selected_course_ids = ["saved-course"]
+    sync = BlackboardSync.__new__(BlackboardSync)
+    sync._config = config
+    sync._force_sync = False
+    sync._next_sync_course_ids = None
+
+    sync.force_sync({"requested-course"})
+
+    assert sync._force_sync is True
+    assert sync._next_sync_course_ids == {"requested-course"}
+    assert config.selected_course_ids == ["saved-course"]
 
 
 @given(st.datetimes())

@@ -3,15 +3,17 @@
 import platform
 from PyInstaller.utils.hooks import copy_metadata
 
+SYSTEM = platform.system()
+
 
 def get_icon():
-    if platform.system() == 'Windows':
+    if SYSTEM == 'Windows':
         return 'packaging\\windows\\icon.ico'
     return 'blackboard_sync/assets/logo.png'
 
 
 def get_datas():
-    s = "\\" if platform.system() == "Windows" else "/"
+    s = "\\" if SYSTEM == "Windows" else "/"
     metadata = copy_metadata('blackboardsync')[0]
 
     return [
@@ -49,7 +51,7 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-if platform.system() == 'Windows':
+if SYSTEM == 'Windows':
     # Single-file exe on Windows
     exe = EXE(
         pyz,
@@ -71,7 +73,8 @@ if platform.system() == 'Windows':
         icon=[get_icon()],
     )
 else:
-    # macOS: folder + app bundle
+    # Linux and macOS use a folder build. Linux stops at COLLECT;
+    # only macOS supports PyInstaller's BUNDLE target.
     exe = EXE(
         pyz,
         a.scripts,
@@ -88,7 +91,6 @@ else:
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=[get_icon()],
     )
     coll = COLLECT(
         exe,
@@ -99,12 +101,13 @@ else:
         upx_exclude=[],
         name='BlackboardSync',
     )
-    app = BUNDLE(
-        coll,
-        name="BlackboardSync.app",
-        icon='blackboard_sync/assets/logo.png',
-        bundle_indentifier='app.bbsync.BlackboardSync',
-        info_plist={
-            'LSUIElement': True
-        },
-    )
+    if SYSTEM == 'Darwin':
+        app = BUNDLE(
+            coll,
+            name="BlackboardSync.app",
+            icon='blackboard_sync/assets/logo.png',
+            bundle_identifier='app.bbsync.BlackboardSync',
+            info_plist={
+                'LSUIElement': True
+            },
+        )

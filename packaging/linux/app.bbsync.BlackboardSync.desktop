@@ -1,7 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name={{ title }}
-Comment={{ summary }}
+Name=Blackboard Sync
+Comment=Automatic Syncing Of Your Blackboard Content
 Exec=blackboardsync
-Icon={{ package }}
+Icon=app.bbsync.BlackboardSync
 Categories=Education;Network;
+Terminal=false
+StartupNotify=false

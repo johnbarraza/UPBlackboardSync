@@ -16,7 +16,9 @@ on:
         options:
           - windows
           - mac
+          - linux
           - both
+          - all
       prerelease:
         description: "Mark release as pre-release"
         required: true

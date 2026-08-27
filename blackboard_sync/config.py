@@ -229,7 +229,7 @@ class SyncConfig(Config):
 
     @property
     def mcp_enabled(self) -> bool:
-        return self._sync.getboolean('mcp_enabled', fallback=False)
+        return self._sync.getboolean('mcp_enabled', fallback=True)
 
     @mcp_enabled.setter
     @Config.persist

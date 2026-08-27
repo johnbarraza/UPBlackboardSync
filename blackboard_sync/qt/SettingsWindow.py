@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (QComboBox, QPushButton, QDialogButtonBox,
 
 from .assets import load_ui
 from .dialogs import DirDialog, FileDialog, CourseSelectionDialog
+from blackboard_sync.__about__ import __title__, __uri__
 
 
 class SettingsWindow(QWidget):
@@ -297,7 +298,11 @@ class SettingsWindow(QWidget):
     def version(self, value: str | None) -> None:
         if value is None:
             value = self.tr("No version detected")
-        self.version_label.setText(value)
+        self.version_label.setOpenExternalLinks(True)
+        self.version_label.setText(
+            f'{__title__} v{value} · <a href="{__uri__}">Repositorio GitHub</a>'
+        )
+        self.version_label.setToolTip(__uri__)
 
     @property
     def data_source(self) -> str:

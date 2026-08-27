@@ -20,10 +20,14 @@ BlackboardSync python entrypoint
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-from blackboard_sync.sync_controller import SyncController
-
-
 def main() -> int:
+    import sys
+
+    if "--self-test" in sys.argv:
+        from blackboard_sync.healthcheck import run_self_test
+        return run_self_test()
+
+    from blackboard_sync.sync_controller import SyncController
     SyncController()
     return 0
 

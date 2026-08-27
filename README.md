@@ -13,6 +13,24 @@ Este proyecto publica dos tipos de archivos:
 - Aplicacion de escritorio (desktop) usa el API de blackboard (más preciso).
 - Extension de navegador para Chrome y Firefox (scrape la pagina, es más proclive a errores).
 
+## Linux (Ubuntu y Arch/Omarchy)
+
+Las versiones Linux se distribuyen como
+`BlackboardSync-VERSION-linux-x86_64.tar.gz`. El paquete incluye Python y las
+dependencias de la aplicacion, por lo que no es necesario instalar PyQt ni usar
+`pip` en el sistema.
+
+```sh
+tar -xzf BlackboardSync-*-linux-x86_64.tar.gz
+cd BlackboardSync-*-linux-x86_64
+./install.sh
+```
+
+La instalacion es solo para el usuario actual, crea el lanzador del escritorio
+y habilita el inicio automatico. Usa `./install.sh --no-autostart` para omitirlo.
+Consulta el `README.md` incluido en el paquete para dependencias graficas y
+desinstalacion.
+
 [![CI][build-shield]][actions]
 [![GitHub Downloads][downloads-shield]][releases]
 [![Latest Release Downloads][release-downloads-shield]][stable]

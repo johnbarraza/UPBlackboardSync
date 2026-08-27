@@ -71,6 +71,8 @@ class BlackboardSync:
 
         # Flag to force sync
         self._force_sync = False
+        # Optional one-run course filter requested through MCP.
+        self._next_sync_course_ids: set[str] | None = None
         # Flag to know if syncing is in progress
         self._is_syncing = False
         # Flag to know if syncing is on
@@ -162,12 +164,20 @@ class BlackboardSync:
         if self.download_location is None:
             return None
 
+        one_run_course_ids = getattr(self, "_next_sync_course_ids", None)
+        selected_course_ids = (
+            one_run_course_ids
+            if one_run_course_ids is not None
+            else set(self.selected_course_ids)
+        )
+        self._next_sync_course_ids = None
+
         self._download = BlackboardDownload(
             user_session,
             self.download_location,
             self.last_sync_time,
             self.min_year,
-            set(self.selected_course_ids),
+            selected_course_ids,
             self.course_sync_status,
             self._mark_course_synced
         )
@@ -209,6 +219,9 @@ class BlackboardSync:
         """
         while self._is_active:
             if self.outdated or self._force_sync:
+                # Clear before starting so a request arriving during this download
+                # remains set and triggers another pass.
+                self._force_sync = False
                 logger.info("Syncing now")
                 self._is_syncing = True
 
@@ -219,7 +232,6 @@ class BlackboardSync:
                     self._run_backup()
 
                 # Reset sync flags
-                self._force_sync = False
                 self._is_syncing = False
 
             if self._is_active:
@@ -348,10 +360,18 @@ class BlackboardSync:
         app_logger.addHandler(file_handler)
         self._log_handler = file_handler
 
-    def force_sync(self) -> None:
+    def force_sync(self, course_ids: set[str] | None = None) -> None:
         """Force Sync thread to start download job ASAP."""
         logger.debug("Forced syncing")
+        self._next_sync_course_ids = course_ids
         self._force_sync = True
+
+    @property
+    def log_path(self) -> Path | None:
+        """Path currently used by the application file logger."""
+        if self._log_handler is None:
+            return None
+        return getattr(self._log_handler, "_blackboardsync_log_path", None)
 
     def redownload(self) -> None:
         self.last_sync_time = None

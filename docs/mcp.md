@@ -12,6 +12,8 @@ BlackboardSync listens on `0.0.0.0:39571` (all interfaces).
 | Same machine | `http://localhost:39571` |
 
 Override port: set `BBSYNC_MCP_PORT` environment variable before launching the app.
+The MCP server is enabled by default on fresh installations and can be disabled or
+moved to another port from **Preferences > MCP server**.
 
 ## Connecting Hermes / OpenClaw (MCP protocol)
 
@@ -39,7 +41,7 @@ Full snapshot of the app state. Good for polling every 30–60 s.
 
 ```json
 {
-  "version": "1.3.1",
+  "version": "1.3.6",
   "logged_in": true,
   "syncing": true,
   "active": true,
@@ -137,6 +139,60 @@ Browse the local download folder. Directories sort before files.
 
 ### `blackboard_sync_now`
 Force an immediate sync. Requires user to be logged in.
+
+---
+
+### `blackboard_sync_course`
+Synchronize only one course for this run. This does not change the courses selected
+in Settings, so it is useful before a class when only that course needs updating.
+
+**Arguments:**
+- `course_id` *(required)* — obtain it from `blackboard_courses`.
+
+If another download is already running, the course-specific run remains queued and
+starts on the next sync pass.
+
+```json
+{ "course_id": "_12345_1" }
+```
+
+---
+
+### `blackboard_course_files`
+Map every locally downloaded material for one course without knowing its year or
+folder name. Returns `file_count`, `total_size_mb`, `local_path`, and a recursive
+`files` list containing relative path, size, and modification time.
+
+**Arguments:**
+- `course_id` *(required)* — obtain it from `blackboard_courses`.
+
+For a course stored at `<download_location>/2026/Calculo Diferencial`, a typical
+response is:
+
+```json
+{
+  "course_id": "_12345_1",
+  "course": "Calculo Diferencial",
+  "local_path": "/home/user/Blackboard/2026/Calculo Diferencial",
+  "file_count": 2,
+  "total_size_mb": 1.4,
+  "files": [
+    {
+      "path": "Semana 1/guia.pdf",
+      "size_kb": 1433.6,
+      "modified": "2026-08-27T08:30:00"
+    },
+    {
+      "path": "Announcements/Bienvenida.md",
+      "size_kb": 2.1,
+      "modified": "2026-08-27T08:31:00"
+    }
+  ]
+}
+```
+
+The year and course directory are resolved from Blackboard metadata; the caller
+does not need to know or construct the `2026/<course>` path.
 
 ---
 
@@ -287,7 +343,9 @@ Every 60 s  →  blackboard_status
   if auth_required or not logged_in  →  alert user, offer blackboard_open_login
   if new courses found (check periodically)  →  alert user
 
-On demand  →  blackboard_courses, blackboard_files, blackboard_sync_now
+On demand  →  blackboard_courses, blackboard_course_status,
+              blackboard_course_files, blackboard_sync_course,
+              blackboard_files, blackboard_sync_now
 ```
 
 ## Security note

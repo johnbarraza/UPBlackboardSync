@@ -34,7 +34,7 @@ __all__ = [
     "__version__",
 ]
 
-__version__ = "1.3.5"
+__version__ = "1.3.6"
 
 __id__ = "app.bbsync.BlackboardSync"
 __title__ = "Blackboard Sync"

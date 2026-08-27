@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.6] - 2026-08-27
+
+### Added
+- Linux x86_64 release package with per-user installers for Ubuntu, Arch Linux, and Omarchy.
+- Packaged application self-test covering Qt WebEngine, assets, REST health, and MCP initialization/tools.
+- Linux MCP integration tests and an Ubuntu 22.04 Docker build verification path.
+- MCP tools to map materials by course and request a one-time sync of only one course.
+
+### Fixed
+- Enable the MCP server by default for fresh installations, matching the documented behavior.
+- Correct the Python console entry point and Linux PyInstaller bundle layout.
+- Keep Nerd Stats attached to the active log file across date changes.
+- Show connection/sync/re-login state in the tray menu and expose version 1.3.6 with a link to this fork.
+
 ### Added
 - **Course announcements sync** — each sync writes one `.md` per announcement into `Announcements/` subfolder per course. Filename: `YYYY-MM-DD - Title.md`. Existing files are never overwritten.
 - **MCP tool `blackboard_announcements`** — fetch live announcements for one or all courses via MCP.

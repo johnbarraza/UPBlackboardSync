@@ -2,6 +2,8 @@
 
 """BlackboardSync Controller."""
 
+import logging
+
 # Copyright (C) 2024, Jacob Sánchez Pérez
 
 # This program is free software; you can redistribute it and/or
@@ -31,6 +33,9 @@ from .qt.dialogs import DiagnosticsDialog
 from .mcp_server import MCPBridge, MCPServer
 
 
+logger = logging.getLogger(__name__)
+
+
 class SyncController:
     """Connects an instance of BlackboardSync with the UI module."""
 
@@ -47,6 +52,7 @@ class SyncController:
         # MCP bridge dispatches HTTP-thread signals to Qt main thread
         self._mcp_bridge = MCPBridge()
         self._mcp_bridge.force_sync_requested.connect(self.force_sync)
+        self._mcp_bridge.sync_course_requested.connect(self._mcp_sync_course)
         self._mcp_bridge.open_login_requested.connect(self._mcp_open_login)
         self._mcp_bridge.restart_sync_requested.connect(self._restart_sync)
 
@@ -54,6 +60,7 @@ class SyncController:
             get_status=self._mcp_get_status,
             get_courses=self._mcp_get_courses,
             get_files=self._mcp_get_files,
+            get_course_files=self._mcp_get_course_files,
             get_announcements=self._mcp_get_announcements,
             get_course_status=self._mcp_get_course_status,
             get_roster=self._mcp_get_roster,
@@ -88,6 +95,11 @@ class SyncController:
             self.model.stop_sync()
         if self.model.is_logged_in:
             self.model.start_sync()
+
+    def _mcp_sync_course(self, course_id: str) -> None:
+        """Queue a one-time sync without changing the saved course selection."""
+        logger.info("MCP requested one-time sync for course %s", course_id)
+        self.model.force_sync({course_id})
 
     def _mcp_get_status(self) -> dict:
         last = self.model.last_sync_time
@@ -207,6 +219,49 @@ class SyncController:
             pass
         return entries
 
+    def _mcp_get_course_files(self, course_id: str) -> dict:
+        from datetime import datetime
+
+        course = next(
+            (c for c in self.model.list_available_courses() if c.id == course_id),
+            None,
+        )
+        if course is None:
+            return {"error": f"Course {course_id!r} not found"}
+
+        loc = self.model.download_location
+        title = course.title or course.name or course_id
+        year = course.created.year if course.created else None
+        if not loc:
+            return {"course_id": course_id, "course": title, "files": [],
+                    "file_count": 0, "total_size_mb": 0.0}
+
+        course_path = loc / (str(year) if year else "No Date") / title
+        files = []
+        total_bytes = 0
+        try:
+            for entry in sorted(course_path.rglob("*")):
+                if not entry.is_file():
+                    continue
+                stat = entry.stat()
+                total_bytes += stat.st_size
+                files.append({
+                    "path": str(entry.relative_to(course_path)),
+                    "size_kb": round(stat.st_size / 1024, 1),
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+        except (OSError, PermissionError):
+            logger.warning("Could not map local files for course %s", course_id)
+
+        return {
+            "course_id": course_id,
+            "course": title,
+            "local_path": str(course_path),
+            "file_count": len(files),
+            "total_size_mb": round(total_bytes / (1024 * 1024), 1),
+            "files": files,
+        }
+
     def _mcp_get_announcements(self, course_id: str | None = None) -> list:
         sess = self.model.sess
         if sess is None:
@@ -238,12 +293,9 @@ class SyncController:
             return []
 
     def _open_diagnostics(self) -> None:
-        log_dir = self.model._config.log_directory
-        from datetime import datetime as _dt
-        log_path = log_dir / f"sync_log_{_dt.now():%Y-%m-%d}.log"
         dlg = DiagnosticsDialog(
             get_status=self._mcp_get_status,
-            log_path=log_path,
+            log_path=self.model.log_path,
             parent=self.ui.config_window,
         )
         dlg.exec()
@@ -385,7 +437,8 @@ class SyncController:
     def open_menu(self) -> None:
         self.ui.open_menu(self.model.last_sync_time,
                           self.model.is_logged_in,
-                          self.model.is_syncing)
+                          self.model.is_syncing,
+                          self._auth_required)
 
         if self.model.has_error:
             self.ui.notify_sync_error()
@@ -432,6 +485,7 @@ class SyncController:
                 get_status=self._mcp_get_status,
                 get_courses=self._mcp_get_courses,
                 get_files=self._mcp_get_files,
+                get_course_files=self._mcp_get_course_files,
                 get_announcements=self._mcp_get_announcements,
                 get_course_status=self._mcp_get_course_status,
                 get_roster=self._mcp_get_roster,

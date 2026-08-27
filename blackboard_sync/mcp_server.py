@@ -37,6 +37,23 @@ _TOOLS: list[dict] = [
         "inputSchema": {"type": "object", "properties": {}},
     },
     {
+        "name": "blackboard_sync_course",
+        "description": (
+            "Synchronize only one course for this run without changing the user's "
+            "saved course selection. Get the course_id from blackboard_courses."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "course_id": {
+                    "type": "string",
+                    "description": "Blackboard course ID (e.g. '_12345_1').",
+                }
+            },
+            "required": ["course_id"],
+        },
+    },
+    {
         "name": "blackboard_open_login",
         "description": (
             "Show the Blackboard login window on the PC. "
@@ -64,6 +81,23 @@ _TOOLS: list[dict] = [
                     "description": "Relative path inside the download folder (e.g. '2024/Calculus'). Empty string for root.",
                 }
             },
+        },
+    },
+    {
+        "name": "blackboard_course_files",
+        "description": (
+            "Map all locally downloaded materials for one course. Returns relative "
+            "paths, sizes, modification times, file count, and total size."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "course_id": {
+                    "type": "string",
+                    "description": "Blackboard course ID (e.g. '_12345_1').",
+                }
+            },
+            "required": ["course_id"],
         },
     },
     {
@@ -151,6 +185,7 @@ class MCPBridge(QObject):
     """Emitted from the HTTP thread; slots run on the Qt main thread."""
     open_login_requested = pyqtSignal()
     force_sync_requested = pyqtSignal()
+    sync_course_requested = pyqtSignal(str)
     restart_sync_requested = pyqtSignal()
 
 
@@ -163,6 +198,7 @@ class _Handler(BaseHTTPRequestHandler):
     get_status: Callable[[], dict]
     get_courses: Callable[[], list]
     get_files: Callable[[str], list]
+    get_course_files: Callable[[str], dict]
     get_announcements: Callable[[str | None], list]
     get_course_status: Callable[[str], dict]
     get_roster: Callable[[str], list]
@@ -268,6 +304,15 @@ class _Handler(BaseHTTPRequestHandler):
         elif name == "blackboard_sync_now":
             self.bridge.force_sync_requested.emit()
             return text("Sync triggered.")
+        elif name == "blackboard_sync_course":
+            course_id = str(args.get("course_id", "")).strip()
+            if not course_id:
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": "course_id is required"}],
+                }
+            self.bridge.sync_course_requested.emit(course_id)
+            return text(f"One-time sync requested for course {course_id}.")
         elif name == "blackboard_open_login":
             self.bridge.open_login_requested.emit()
             return text("Login window shown on PC.")
@@ -277,6 +322,16 @@ class _Handler(BaseHTTPRequestHandler):
             subpath = args.get("subpath", "")
             entries = self.get_files(subpath)
             return text(json.dumps(entries, default=str, indent=2))
+        elif name == "blackboard_course_files":
+            course_id = str(args.get("course_id", "")).strip()
+            if not course_id:
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": "course_id is required"}],
+                }
+            return text(json.dumps(
+                self.get_course_files(course_id), default=str, indent=2
+            ))
         elif name == "blackboard_restart":
             self.bridge.restart_sync_requested.emit()
             return text("Sync engine restarted.")
@@ -321,6 +376,7 @@ class MCPServer:
         get_status: Callable[[], dict],
         get_courses: Callable[[], list],
         get_files: Callable[[str], list],
+        get_course_files: Callable[[str], dict],
         get_announcements: Callable[[str | None], list],
         get_course_status: Callable[[str], dict],
         get_roster: Callable[[str], list],
@@ -328,7 +384,10 @@ class MCPServer:
         bridge: MCPBridge,
         port: int | None = None,
     ) -> None:
-        self._port = port or int(os.environ.get("BBSYNC_MCP_PORT", DEFAULT_PORT))
+        self._port = (
+            int(os.environ.get("BBSYNC_MCP_PORT", DEFAULT_PORT))
+            if port is None else port
+        )
         self._handler_cls = type(
             "Handler",
             (_Handler,),
@@ -336,6 +395,7 @@ class MCPServer:
                 "get_status": staticmethod(get_status),
                 "get_courses": staticmethod(get_courses),
                 "get_files": staticmethod(get_files),
+                "get_course_files": staticmethod(get_course_files),
                 "get_announcements": staticmethod(get_announcements),
                 "get_course_status": staticmethod(get_course_status),
                 "get_roster": staticmethod(get_roster),
@@ -345,16 +405,24 @@ class MCPServer:
         )
         self._server: ThreadingHTTPServer | None = None
 
+    @property
+    def port(self) -> int:
+        """Return the bound port, including an OS-assigned ephemeral port."""
+        if self._server is not None:
+            return self._server.server_port
+        return self._port
+
     def start(self) -> None:
         try:
             self._server = ThreadingHTTPServer(("0.0.0.0", self._port), self._handler_cls)
             t = threading.Thread(target=self._server.serve_forever, daemon=True)
             t.start()
-            logger.info("MCP server listening on 0.0.0.0:%d", self._port)
+            logger.info("MCP server listening on 0.0.0.0:%d", self.port)
         except OSError:
             logger.exception("MCP server failed to start (port %d in use?)", self._port)
 
     def stop(self) -> None:
         if self._server:
             self._server.shutdown()
+            self._server.server_close()
             self._server = None
