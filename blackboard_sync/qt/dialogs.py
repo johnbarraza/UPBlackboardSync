@@ -18,7 +18,7 @@
 import webbrowser
 from pathlib import Path
 from datetime import datetime
-from typing import Callable
+from typing import Any, Callable
 
 from PyQt6.QtCore import QObject, Qt, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
@@ -174,7 +174,7 @@ class DiagnosticsDialog(QDialog):
     """Nerd stats: sync status + live-refreshable log viewer."""
 
     def __init__(self,
-                 get_status: Callable[[], dict],
+                 get_status: Callable[[], dict[str, Any]],
                  log_path: Path | None,
                  parent: QWidget | None = None) -> None:
         super().__init__(parent)
