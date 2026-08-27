@@ -299,8 +299,11 @@ class SettingsWindow(QWidget):
         if value is None:
             value = self.tr("No version detected")
         self.version_label.setOpenExternalLinks(True)
+        repository_link = (
+            f'<a href="{__uri__}">Repositorio GitHub</a>'
+        )
         self.version_label.setText(
-            f'{__title__} v{value} · <a href="{__uri__}">Repositorio GitHub</a>'
+            f'{__title__} v{value} · {repository_link}'
         )
         self.version_label.setToolTip(__uri__)
 

@@ -250,7 +250,10 @@ class DiagnosticsDialog(QDialog):
             logged_in = s.get('logged_in')
             conn = "Connected" if logged_in else "Disconnected"
             syncing = "Yes" if s.get('syncing') else "No"
-            auth_req = "Yes (re-login needed)" if s.get('auth_required') else "No"
+            auth_req = (
+                "Yes (re-login needed)"
+                if s.get('auth_required') else "No"
+            )
             lines = [
                 f"version      : {__version__}",
                 f"status       : {conn}",
@@ -258,7 +261,9 @@ class DiagnosticsDialog(QDialog):
                 f"auth_required: {auth_req}",
                 f"last_sync    : {s.get('last_sync') or '—'}",
                 f"next_sync    : {s.get('next_sync') or '—'}",
-                f"files        : {s.get('files_count', '?')}  |  disk: {s.get('disk_usage_mb', '?')} MB",
+                "files        : "
+                f"{s.get('files_count', '?')}  |  "
+                f"disk: {s.get('disk_usage_mb', '?')} MB",
                 f"university   : {s.get('university', '?')}",
                 f"location     : {s.get('download_location', '?')}",
                 f"log file     : {self._log_path or '—'}",
