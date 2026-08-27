@@ -38,9 +38,14 @@ class Course:
         self.roster = Roster.fetch(job.session, course.id)
 
     @staticmethod
-    def _fetch_announcements(course_id: str, job: DownloadJob) -> list[Announcement]:
+    def _fetch_announcements(
+        course_id: str,
+        job: DownloadJob,
+    ) -> list[Announcement]:
         try:
-            result = job.session.fetch_course_announcements(course_id=course_id)
+            result = job.session.fetch_course_announcements(
+                course_id=course_id
+            )
             if isinstance(result, dict):
                 items = result.get("results", [])
             elif isinstance(result, list):

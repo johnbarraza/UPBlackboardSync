@@ -23,21 +23,32 @@ class Announcement:
     def write(self, folder: Path) -> None:
         folder.mkdir(parents=True, exist_ok=True)
 
-        date_str = self.created.strftime("%Y-%m-%d") if self.created else "No-Date"
-        safe_title = sanitize_filename(self.title, replacement_text="_") or "Untitled"
+        date_str = (
+            self.created.strftime("%Y-%m-%d")
+            if self.created else "No-Date"
+        )
+        safe_title = (
+            sanitize_filename(self.title, replacement_text="_") or "Untitled"
+        )
         filename = f"{date_str} - {safe_title}.md"
         filepath = folder / filename
 
         if filepath.exists():
             return
 
-        body_text = (
-            BeautifulSoup(self.body_html, "lxml").get_text(separator="\n").strip()
-            if self.body_html
-            else ""
-        )
+        if self.body_html:
+            soup = BeautifulSoup(self.body_html, "lxml")
+            body_text = soup.get_text(separator="\n").strip()
+        else:
+            body_text = ""
 
-        timestamp = self.created.strftime("%Y-%m-%d %H:%M UTC") if self.created else "Unknown"
-        content = f"# {self.title}\n\n**Date:** {timestamp}\n\n---\n\n{body_text}\n"
+        timestamp = (
+            self.created.strftime("%Y-%m-%d %H:%M UTC")
+            if self.created else "Unknown"
+        )
+        content = (
+            f"# {self.title}\n\n**Date:** {timestamp}"
+            f"\n\n---\n\n{body_text}\n"
+        )
 
         filepath.write_text(content, encoding="utf-8")

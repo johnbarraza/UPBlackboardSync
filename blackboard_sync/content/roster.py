@@ -30,13 +30,13 @@ class Roster:
 
         updated = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         lines = [
-            f"# Roster",
-            f"",
+            "# Roster",
+            "",
             f"**Last updated:** {updated}  ",
             f"**Members found:** {len(self.members)}",
-            f"",
-            f"| # | User ID | Role | Available |",
-            f"|---|---------|------|-----------|",
+            "",
+            "| # | User ID | Role | Available |",
+            "|---|---------|------|-----------|",
         ]
 
         for i, m in enumerate(self.members, 1):
