@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-08-28
+
+### Fixed
+- Universidad del Pacífico login window now closes after sign-in (login target URL `/ultra/course` → `/ultra/`; it was too specific to ever match the landing page).
+- Opening downloads / external apps on Linux no longer crashes the system file manager: `xdg-open` is launched with a sanitized environment that drops PyInstaller's bundled `LD_LIBRARY_PATH`/`LD_PRELOAD`.
+- Linux launcher supports a Wayland/NVIDIA software-rendering fallback (`BLACKBOARDSYNC_SOFTWARE_RENDERING=1`) for Omarchy/Arch setups where Qt WebEngine + GPU fails.
+
+### Added
+- Packaged self-test and unit tests verifying `clean_external_env()` never leaks bundled libs to external processes.
+
 ## [1.3.6] - 2026-08-27
 
 ### Added

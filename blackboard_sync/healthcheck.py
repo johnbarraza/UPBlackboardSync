@@ -32,6 +32,15 @@ def run_self_test() -> int:
 
     from .mcp_server import MCPBridge, MCPServer
     from .qt.assets import logo
+    from .qt.utils import clean_external_env
+
+    # External apps (xdg-open) must not inherit PyInstaller's bundled libs.
+    if sys.platform.startswith("linux"):
+        external = clean_external_env()
+        if "_internal" in external.get("LD_LIBRARY_PATH", ""):
+            raise RuntimeError("clean_external_env leaked bundled LD_LIBRARY_PATH")
+        if "LD_PRELOAD" in external:
+            raise RuntimeError("clean_external_env leaked LD_PRELOAD")
 
     app = QApplication.instance() or QApplication([])
     if logo().isNull():
@@ -93,6 +102,6 @@ def run_self_test() -> int:
 
     print(json.dumps({
         "ok": True,
-        "checks": ["qt", "assets", "rest", "mcp_initialize", "mcp_tools"],
+        "checks": ["qt", "assets", "external_env", "rest", "mcp_initialize", "mcp_tools"],
     }))
     return 0

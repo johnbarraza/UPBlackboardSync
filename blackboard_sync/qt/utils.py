@@ -28,15 +28,37 @@ from datetime import datetime, timezone
 from PyQt6.QtCore import QSettings, QObject
 
 
+def clean_external_env() -> dict[str, str]:
+    """Env for launching system apps, stripped of PyInstaller's bundled libs.
+
+    PyInstaller sets LD_LIBRARY_PATH to its _internal dir so the frozen app
+    finds its own libstdc++/libssl. Inheriting that into xdg-open makes the
+    system file manager (Nautilus, etc.) load our bundled libs and crash.
+    """
+    env = os.environ.copy()
+
+    if sys.platform.startswith("linux"):
+        original = env.get("LD_LIBRARY_PATH_ORIG")
+
+        if original:
+            env["LD_LIBRARY_PATH"] = original
+        else:
+            env.pop("LD_LIBRARY_PATH", None)
+
+        env.pop("LD_PRELOAD", None)
+
+    return env
+
+
 def open_in_file_browser(file: Path) -> None:
     """Open the given file in the system file browser."""
 
     if sys.platform == "win32":
         os.startfile(file)
     elif platform.system() == "Darwin":
-        subprocess.Popen(["open", file])
+        subprocess.Popen(["open", str(file)])
     else:
-        subprocess.Popen(["xdg-open", file])
+        subprocess.Popen(["xdg-open", str(file)], env=clean_external_env())
 
 
 def add_to_startup(app_id: str) -> None:

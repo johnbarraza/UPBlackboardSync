@@ -1,0 +1,3 @@
+# Shell scripts must keep LF line endings so they run on Linux/macOS.
+*.sh text eol=lf
+packaging/linux/blackboardsync-launcher text eol=lf

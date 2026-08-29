@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+# BlackboardSync launcher. Resolves its own real location (works when invoked
+# through the ~/.local/bin symlink) and optionally forces software rendering
+# for Wayland/NVIDIA setups (e.g. Omarchy/Arch) where Qt WebEngine + GPU fails.
+#
+# Enable the fallback with:  BLACKBOARDSYNC_SOFTWARE_RENDERING=1 blackboardsync
+
+SELF=$(readlink -f "$0" 2>/dev/null || echo "$0")
+DIR=$(dirname "$SELF")
+
+if [ "${BLACKBOARDSYNC_SOFTWARE_RENDERING:-0}" = "1" ]; then
+    export QT_QUICK_BACKEND=software
+    export QT_OPENGL=software
+    export QTWEBENGINE_CHROMIUM_FLAGS="${QTWEBENGINE_CHROMIUM_FLAGS:+$QTWEBENGINE_CHROMIUM_FLAGS }--disable-gpu"
+fi
+
+exec "$DIR/BlackboardSync" "$@"

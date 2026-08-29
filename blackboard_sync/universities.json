@@ -824,7 +824,7 @@
     "country": "PE",
     "login": {
       "start_url": "https://aulavirtual.up.edu.pe/",
-      "target_url": "https://aulavirtual.up.edu.pe/ultra/course"
+      "target_url": "https://aulavirtual.up.edu.pe/ultra/"
     },
     "network": {
       "name": [

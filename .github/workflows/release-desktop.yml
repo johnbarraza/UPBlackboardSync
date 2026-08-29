@@ -333,8 +333,9 @@ jobs:
           cp replaced/app.bbsync.BlackboardSync.desktop "$PACKAGE_DIR/"
           cp packaging/linux/icon.svg "$PACKAGE_DIR/app.bbsync.BlackboardSync.svg"
           cp packaging/linux/install.sh packaging/linux/uninstall.sh "$PACKAGE_DIR/"
+          cp packaging/linux/blackboardsync-launcher "$PACKAGE_DIR/"
           cp packaging/linux/README-LINUX.md "$PACKAGE_DIR/README.md"
-          chmod +x "$PACKAGE_DIR/install.sh" "$PACKAGE_DIR/uninstall.sh"
+          chmod +x "$PACKAGE_DIR/install.sh" "$PACKAGE_DIR/uninstall.sh" "$PACKAGE_DIR/blackboardsync-launcher"
           tar -C dist -czf "dist/BlackboardSync-${VERSION}-linux-x86_64.tar.gz" \
             "BlackboardSync-${VERSION}-linux-x86_64"
 
@@ -343,9 +344,46 @@ jobs:
           name: desktop-linux
           path: dist/*-linux-x86_64.tar.gz
 
+  verify-arch:
+    if: ${{ needs.prepare.outputs.target == 'linux' || needs.prepare.outputs.target == 'all' }}
+    needs: [prepare, build-linux]
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - name: Install runtime libraries
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed \
+            python nss alsa-lib xdg-utils glib2 fontconfig freetype2 dbus \
+            libxcomposite libxdamage libxrandr libxtst libxkbcommon-x11 \
+            libxcb xcb-util-keysyms xcb-util-wm xorg-server-xvfb mesa tar gzip
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: desktop-linux
+          path: dist
+
+      - name: Extract package
+        run: tar -C dist -xzf dist/BlackboardSync-${VERSION}-linux-x86_64.tar.gz
+
+      - name: Self-test packaged binary on Arch
+        env:
+          QTWEBENGINE_DISABLE_SANDBOX: "1"
+        run: |
+          BIN="dist/BlackboardSync-${VERSION}-linux-x86_64/BlackboardSync/BlackboardSync"
+          xvfb-run --auto-servernum "$BIN" --self-test
+
+      - name: Verify installer runs on Arch
+        run: |
+          export HOME=/root
+          dist/BlackboardSync-${VERSION}-linux-x86_64/install.sh --no-autostart
+          test -x "$HOME/.local/bin/blackboardsync"
+
   release:
-    needs: [prepare, build-windows, build-macos, build-linux]
-    if: ${{ always() && (needs.build-windows.result == 'success' || needs.build-macos.result == 'success' || needs.build-linux.result == 'success') }}
+    needs: [prepare, build-windows, build-macos, build-linux, verify-arch]
+    if: ${{ always() && needs.verify-arch.result != 'failure' && (needs.build-windows.result == 'success' || needs.build-macos.result == 'success' || needs.build-linux.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

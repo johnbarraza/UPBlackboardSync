@@ -32,9 +32,11 @@ cp -R "$SOURCE_DIR" "$APP_DIR"
 chmod +x "$APP_DIR/BlackboardSync"
 cp "$SCRIPT_DIR/uninstall.sh" "$APP_DIR/uninstall.sh"
 chmod +x "$APP_DIR/uninstall.sh"
-ln -sfn "$APP_DIR/BlackboardSync" "$BIN_HOME/blackboardsync"
+cp "$SCRIPT_DIR/blackboardsync-launcher" "$APP_DIR/blackboardsync-launcher"
+chmod +x "$APP_DIR/blackboardsync-launcher"
+ln -sfn "$APP_DIR/blackboardsync-launcher" "$BIN_HOME/blackboardsync"
 
-sed "s|^Exec=.*|Exec=\"$APP_DIR/BlackboardSync\"|" \
+sed "s|^Exec=.*|Exec=\"$APP_DIR/blackboardsync-launcher\"|" \
     "$SCRIPT_DIR/$DESKTOP_ID" > "$APPLICATIONS_DIR/$DESKTOP_ID"
 cp "$SCRIPT_DIR/app.bbsync.BlackboardSync.svg" \
     "$ICONS_DIR/app.bbsync.BlackboardSync.svg"
