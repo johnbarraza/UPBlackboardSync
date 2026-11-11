@@ -12,9 +12,9 @@ Licencia: GPL-2.0 (se mantiene la licencia del proyecto original).
   </a>
 </p>
 
-En el release descarga `BlackboardSync-VERSION-Setup.exe` (instalador) o
-`BlackboardSync.exe` (portable). Si Windows muestra SmartScreen: "Más
-información" → "Ejecutar de todas formas".
+En el release descarga `BlackboardSync-VERSION-Setup.exe` (instalador,
+recomendado) o `BlackboardSync-VERSION-Portable.exe` (sin instalar). Si
+Windows muestra SmartScreen: "Más información" → "Ejecutar de todas formas".
 
 ## Distribucion
 

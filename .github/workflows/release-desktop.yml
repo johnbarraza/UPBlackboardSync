@@ -231,6 +231,10 @@ jobs:
           & $makensis "/V3" "/DVERSION=$env:VERSION" "replaced\pkg_win.nsi"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Name portable exe
+        shell: powershell
+        run: Rename-Item dist\BlackboardSync.exe "BlackboardSync-$env:VERSION-Portable.exe"
+
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-windows
