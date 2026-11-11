@@ -134,6 +134,7 @@ def test_children_file(api_path: BBContentPath,
     job.session.fetch_file_attachments.return_value = attachments
 
     calls = []
+    content = mock.Mock()
 
     # Setup calls
     for att in attachments:
@@ -141,10 +142,10 @@ def test_children_file(api_path: BBContentPath,
             assume(not att.mimeType.startswith("video/"))
             assume(not att.mimeType == '*')
 
-        calls.append(mock.call(att, api_path, job))
+        calls.append(mock.call(att, api_path, job, content.created))
 
     with mock.patch('blackboard_sync.content.document.Attachment') as p:
-        Document(None, api_path, job)
+        Document(content, api_path, job)
         p.assert_has_calls(calls)
 
 

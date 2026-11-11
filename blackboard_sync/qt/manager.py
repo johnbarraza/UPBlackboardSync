@@ -38,6 +38,7 @@ class UIManager(QObject):
         open_tray = pyqtSignal(bool)
         open_menu = pyqtSignal()
         open_downloads = pyqtSignal()
+        open_dashboard = pyqtSignal()
         setup = pyqtSignal(int, Path, int)
         config = pyqtSignal(
             Path, int, bool, object, bool, object, object, bool, int)
@@ -103,6 +104,7 @@ class UIManager(QObject):
         self.tray.signals.show_menu.connect(self.signals.open_menu)
         self.tray.signals.settings.connect(self.signals.open_settings)
         self.tray.signals.open_dir.connect(self.signals.open_downloads)
+        self.tray.signals.open_dashboard.connect(self.signals.open_dashboard)
         self.tray.signals.quit.connect(self.signals.quit)
         self.tray.signals.reset_setup.connect(self.slot_open_setup)
         self.tray.activated.connect(self.slot_open_tray)
@@ -263,7 +265,7 @@ class UIManager(QObject):
             self.setup_window
         )
         if dialog.exec():
-            return dialog.selected_course_ids
+            return dialog.result_ids
         return None
 
     def open_menu(self, last_sync: datetime,

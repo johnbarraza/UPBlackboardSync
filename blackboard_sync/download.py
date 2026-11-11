@@ -33,8 +33,10 @@ from blackboard.api_extended import BlackboardExtended
 from blackboard.filters import BBMembershipFilter, BWFilter
 
 from .executor import SyncExecutor
+from .dashboard import write_dashboard
 from .content.job import DownloadJob
 from .content.course import Course
+from .content import base as content_base
 
 
 logger = logging.getLogger(__name__)
@@ -42,12 +44,12 @@ logger = logging.getLogger(__name__)
 _ACTIVITY_WINDOW = timedelta(hours=4)
 
 
-def _write_activity_md(download_location: Path, start_time: datetime) -> None:
+def _write_activity_md(download_location: Path,
+                       written: list[tuple[Path, float]]) -> None:
     json_path = download_location / ".recent_activity.json"
     md_path = download_location / "recent.md"
     now = datetime.now(timezone.utc)
     cutoff = now - _ACTIVITY_WINDOW
-    start_ts = start_time.timestamp()
 
     existing: list[dict] = []
     if json_path.exists():
@@ -56,30 +58,25 @@ def _write_activity_md(download_location: Path, start_time: datetime) -> None:
         except Exception:
             existing = []
 
+    # Files written this sync (recorded by the writers). mtime is now the
+    # Blackboard posting date, so it can't tell what was just downloaded.
     new_entries: list[dict] = []
-    try:
-        for f in download_location.rglob("*"):
-            if not f.is_file():
-                continue
-            if f.name.startswith(".") or f.name == "recent.md":
-                continue
-            try:
-                st = f.stat()
-                if st.st_mtime >= start_ts:
-                    rel = f.relative_to(download_location)
-                    parts = rel.parts
-                    course = parts[1] if len(parts) >= 3 else (parts[0] if parts else "")
-                    new_entries.append({
-                        "path": str(rel),
-                        "name": f.name,
-                        "course": course,
-                        "size_kb": round(st.st_size / 1024, 1),
-                        "synced_at": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
-                    })
-            except OSError:
-                pass
-    except Exception:
-        logger.warning("Could not scan for activity files")
+    for f, downloaded_ts in written:
+        try:
+            st = f.stat()
+            rel = f.relative_to(download_location)
+        except (OSError, ValueError):
+            continue
+        parts = rel.parts
+        course = parts[1] if len(parts) >= 3 else (parts[0] if parts else "")
+        new_entries.append({
+            "path": str(rel),
+            "name": f.name,
+            "course": course,
+            "size_kb": round(st.st_size / 1024, 1),
+            "synced_at": datetime.fromtimestamp(downloaded_ts, tz=timezone.utc).isoformat(),
+            "posted_at": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(),
+        })
 
     seen = {e["path"] for e in new_entries}
     cutoff_iso = cutoff.isoformat()
@@ -171,6 +168,7 @@ class BlackboardDownload:
         logger.info("Starting Blackboard content download")
 
         start_time = datetime.now(timezone.utc)
+        content_base.written.clear()
 
         if not self.download_location.exists():
             self.download_location.mkdir(parents=True)
@@ -220,7 +218,8 @@ class BlackboardDownload:
         self.executor.shutdown(wait=True, cancel_futures=self.cancelled)
         failed_files = self.executor.raise_exceptions()
 
-        _write_activity_md(self.download_location, start_time)
+        _write_activity_md(self.download_location, content_base.written)
+        write_dashboard(self.download_location)
 
         if failed_files > 0:
             logger.warning(

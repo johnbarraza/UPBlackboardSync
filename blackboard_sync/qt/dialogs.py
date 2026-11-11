@@ -145,6 +145,13 @@ class CourseSelectionDialog(QDialog):
                     selected.append(str(course_id))
         return selected
 
+    @property
+    def result_ids(self) -> list[str]:
+        """Selection to store: [] means 'all', so courses enrolled later
+        (next semester) are synced too."""
+        ids = self.selected_course_ids
+        return [] if len(ids) == self._list.count() else ids
+
     def _select_all(self) -> None:
         for i in range(self._list.count()):
             item = self._list.item(i)

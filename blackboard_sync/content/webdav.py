@@ -22,6 +22,7 @@ Parse an html to look for links
 
 import os
 import re
+import json
 import uuid
 import mimetypes
 from pathlib import Path
@@ -32,7 +33,9 @@ from typing import List, NamedTuple
 from pathvalidate import sanitize_filename
 from concurrent.futures import ThreadPoolExecutor
 
-from .base import BStream
+from datetime import datetime
+
+from .base import BStream, has_extension
 from .job import DownloadJob
 
 
@@ -67,10 +70,21 @@ class ContentParser:
             if uri:
                 display = None
 
+                # Priority 0: Ultra embeds the real name in data-bbfile JSON
+                # (the href itself is just .../xid-24187548_1).
+                try:
+                    bbfile = json.loads(el.get('data-bbfile') or '{}')
+                except ValueError:
+                    bbfile = {}
+                if isinstance(bbfile, dict):
+                    display = (bbfile.get('displayName')
+                               or bbfile.get('linkName')
+                               or bbfile.get('fileName')) or None
+
                 # Priority 1: use aria-label for filename
                 # (Blackboard Ultra uses this).
                 aria_label = el.get('aria-label', '')
-                if aria_label:
+                if aria_label and not display:
                     # Extract name from "Preview File filename.pdf"
                     match = re.search(
                         r'(?:Preview File|Download|File)\s+(.+?)(?:\s*$)',
@@ -179,7 +193,9 @@ def validate_webdav_response(response: Response,
 
 class WebDavFile(BStream):
     """A Blackboard WebDav file which can be downloaded directly"""
-    def __init__(self, link: Link, job: DownloadJob) -> None:
+    def __init__(self, link: Link, job: DownloadJob,
+                 posted: datetime | None = None) -> None:
+        self.posted = posted
         # Download first, then try to determine a safe filename
         self.stream = job.session.download_webdav(webdav_url=link.href)
 
@@ -210,15 +226,16 @@ class WebDavFile(BStream):
         self.title = sanitize_filename(unquote(filename), replacement_text="_")
 
         content_type = self.stream.headers.get('Content-Type', 'text/plain')
-        self.extension = mimetypes.guess_extension(content_type) or ''
+        mime = content_type.split(';')[0].strip()
+        # Keep the real extension (.docx served as octet-stream -> .bin)
+        self.extension = '' if has_extension(self.title) else (
+            mimetypes.guess_extension(mime) or '')
         self.valid = validate_webdav_response(self.stream, link.href,
                                               job.session.instance_url)
 
     def write(self, path: Path, executor: ThreadPoolExecutor) -> None:
         if self.valid:
-            path = Path(path, self.title)
-
-            if self.extension:
-                path = path.with_suffix(self.extension)
+            # append, never with_suffix: 'Clase 1.2 final' must not lose '.2'
+            path = Path(path, self.title + self.extension)
 
             super().write_base(path, executor, self.stream)

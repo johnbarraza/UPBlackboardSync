@@ -70,6 +70,50 @@
 <context>
     <name>SettingsWindow</name>
     <message>
+        <source>Courses to sync</source>
+        <translation>Cursos a sincronizar</translation>
+    </message>
+    <message>
+        <source>Select courses</source>
+        <translation>Elegir cursos</translation>
+    </message>
+    <message>
+        <source>No courses loaded yet</source>
+        <translation>Aún no se cargaron cursos</translation>
+    </message>
+    <message>
+        <source>All courses (%1)</source>
+        <translation>Todos los cursos (%1)</translation>
+    </message>
+    <message>
+        <source>Selected courses: %1/%2</source>
+        <translation>Cursos elegidos: %1/%2</translation>
+    </message>
+    <message>
+        <source>Automatic login</source>
+        <translation>Inicio de sesión automático</translation>
+    </message>
+    <message>
+        <source>Save username and password to log in again automatically</source>
+        <translation>Guardar usuario y contraseña para volver a iniciar sesión automáticamente</translation>
+    </message>
+    <message>
+        <source>Username</source>
+        <translation>Usuario</translation>
+    </message>
+    <message>
+        <source>Password</source>
+        <translation>Contraseña</translation>
+    </message>
+    <message>
+        <source>Saved — type to change</source>
+        <translation>Guardada — escribe para cambiarla</translation>
+    </message>
+    <message>
+        <source>Stored encrypted in the system credential manager, never in the config file. Untick to delete it.</source>
+        <translation>Se guarda cifrada en el Administrador de credenciales del sistema, nunca en el archivo de configuración. Desmarca la opción para borrarla.</translation>
+    </message>
+    <message>
         <location filename="../SettingsWindow.ui" line="0"/>
         <source>Preferences</source>
         <translation>Preferencias</translation>
@@ -189,6 +233,11 @@
         <location filename="../SyncTrayIcon.py" line="49"/>
         <source>Open downloads</source>
         <translation>Abrir descargas</translation>
+    </message>
+    <message>
+        <location filename="../SyncTrayIcon.py" line="53"/>
+        <source>Open dashboard</source>
+        <translation>Abrir panel de cursos</translation>
     </message>
     <message>
         <location filename="../SyncTrayIcon.py" line="53"/>
@@ -335,6 +384,41 @@
         <location filename="../notification.py" line="67"/>
         <source>Click the tray icon to manage your downloads</source>
         <translation>Puedes gestionar tus descargas desde la bandeja</translation>
+    </message>
+</context>
+<context>
+    <name>CourseSelectionDialog</name>
+    <message>
+        <source>Select courses to sync</source>
+        <translation>Elegir cursos a sincronizar</translation>
+    </message>
+    <message>
+        <source>Never</source>
+        <translation>Nunca</translation>
+    </message>
+    <message>
+        <source>Last sync</source>
+        <translation>Última sincronización</translation>
+    </message>
+    <message>
+        <source>Choose which courses should be synchronized.</source>
+        <translation>Elige qué cursos se sincronizan. Si marcas todos, también se incluyen los cursos nuevos del próximo semestre.</translation>
+    </message>
+    <message>
+        <source>Select all</source>
+        <translation>Marcar todos</translation>
+    </message>
+    <message>
+        <source>Clear</source>
+        <translation>Desmarcar todos</translation>
+    </message>
+    <message>
+        <source>No courses selected</source>
+        <translation>Ningún curso elegido</translation>
+    </message>
+    <message>
+        <source>Select at least one course to continue.</source>
+        <translation>Elige al menos un curso para continuar.</translation>
     </message>
 </context>
 </TS>

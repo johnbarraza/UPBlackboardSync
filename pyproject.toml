@@ -34,7 +34,8 @@ dependencies = [
     "whoisit",
     "bwfilters",
     "google-api-python-client>=2.0.0",
-    "google-auth-oauthlib>=1.0.0"
+    "google-auth-oauthlib>=1.0.0",
+    "keyring>=24"
 ]
 
 [project.scripts]

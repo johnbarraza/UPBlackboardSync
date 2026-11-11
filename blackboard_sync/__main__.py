@@ -28,8 +28,25 @@ def main() -> int:
         from .healthcheck import run_self_test
         return run_self_test()
 
+    # One instance only: two copies fight over the login profile, the MCP
+    # port and the download folder, and the app freezes.
+    from PyQt6.QtCore import QLockFile
+    from .config import SyncConfig
+    lock_dir = SyncConfig().log_directory.parent
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock = QLockFile(str(lock_dir / "instance.lock"))
+    if not lock.tryLock(500):  # stale locks of dead processes are reclaimed
+        from PyQt6.QtWidgets import QApplication, QMessageBox
+        _app = QApplication(sys.argv)
+        QMessageBox.information(
+            None, "BlackboardSync",
+            "BlackboardSync ya está abierto.\n"
+            "Búscalo en la bandeja del sistema (junto al reloj).")
+        return 1
+
     from .sync_controller import SyncController
     SyncController()
+    lock.unlock()
     return 0
 
 

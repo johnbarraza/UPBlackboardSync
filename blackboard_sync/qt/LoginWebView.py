@@ -17,6 +17,7 @@
 
 import webbrowser
 from threading import Timer
+from urllib.parse import urlparse
 from requests.cookies import RequestsCookieJar
 
 from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject, QUrl
@@ -26,6 +27,7 @@ from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 from .assets import load_ui, get_theme_icon, AppIcon
+from blackboard_sync import credentials
 
 
 WATCHDOG_DELAY = 30
@@ -52,6 +54,9 @@ class LoginWebView(QWidget):
 
         self.start_url: str | None = None
         self.target_url: str | None = None
+        # one autofill attempt per load(): a wrong saved password must not
+        # loop submitting forever
+        self._autofill_done = False
 
         self._cookie_jar = RequestsCookieJar()
         self.help_url = help_url
@@ -69,6 +74,10 @@ class LoginWebView(QWidget):
 
         # Since Qt6 a persistent profile must be created manually
         self.profile = QWebEngineProfile(PROFILE_STORAGE_NAME)
+        # Blackboard's session cookies have no expiry, so Chromium would
+        # drop them on exit and ask to log in on every start.
+        self.profile.setPersistentCookiesPolicy(
+            QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
         self.page = QWebEnginePage(self.profile)
         self.web_view.setPage(self.page)
 
@@ -88,6 +97,7 @@ class LoginWebView(QWidget):
     def load(self, start_url: str | None, target_url: str | None) -> None:
         self.start_url = start_url
         self.target_url = target_url
+        self._autofill_done = False
 
         # start watchdog
         self.watchdog = Timer(WATCHDOG_DELAY, self.show_help)
@@ -105,6 +115,24 @@ class LoginWebView(QWidget):
             if self.watchdog:
                 self.watchdog.cancel()
             self.signals.login_complete.emit()
+        else:
+            self._try_autofill()
+
+    def _try_autofill(self) -> None:
+        if self._autofill_done or not self.start_url:
+            return
+        # only ever hand the password to the university's own login host
+        if urlparse(self.url).hostname != urlparse(self.start_url).hostname:
+            return
+        saved = credentials.load()
+        if saved is None:
+            return
+
+        def done(filled: object) -> None:
+            if filled:
+                self._autofill_done = True
+
+        self.page.runJavaScript(credentials.autofill_js(*saved), done)
 
     @pyqtSlot(QNetworkCookie)
     def slot_cookie_added(self, cookie: QNetworkCookie) -> None:

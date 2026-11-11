@@ -21,6 +21,7 @@ bwfilters = "==0.1.0"
 urllib3 = ">=2.6.0"
 google-api-python-client = "*"
 google-auth-oauthlib = "*"
+keyring = "*"
 
 [dev-packages]
 coverage = "*"

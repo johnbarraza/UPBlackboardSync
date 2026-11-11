@@ -59,6 +59,10 @@ class SyncTrayMenu(QMenu):
         self.open_dir.setIcon(open_dir_icon)
         self.addAction(self.open_dir)
 
+        self.open_dashboard = QAction(self.tr("Open dashboard"))
+        self.open_dashboard.setIcon(open_dir_icon)
+        self.addAction(self.open_dashboard)
+
         self.preferences = QAction(self.tr("Preferences"))
         self.addAction(self.preferences)
 
@@ -82,6 +86,7 @@ class SyncTrayMenu(QMenu):
         self.preferences.setVisible(logged_in)
         self.reset_setup.setVisible(not logged_in)
         self.open_dir.setVisible(logged_in)
+        self.open_dashboard.setVisible(logged_in)
 
         self._update_status()
 
@@ -123,6 +128,7 @@ class SyncTrayIcon(QSystemTrayIcon):
         reset_setup = pyqtSignal()
         quit = pyqtSignal()
         open_dir = pyqtSignal()
+        open_dashboard = pyqtSignal()
         show_menu = pyqtSignal()
 
     def __init__(self) -> None:
@@ -147,6 +153,8 @@ class SyncTrayIcon(QSystemTrayIcon):
         self._menu.reset_setup.triggered.connect(self.signals.reset_setup)
         self._menu.quit.triggered.connect(self.signals.quit)
         self._menu.open_dir.triggered.connect(self.signals.open_dir)
+        self._menu.open_dashboard.triggered.connect(
+            self.signals.open_dashboard)
         self._menu.aboutToShow.connect(self.signals.show_menu)
 
         # Add the menu to the tray

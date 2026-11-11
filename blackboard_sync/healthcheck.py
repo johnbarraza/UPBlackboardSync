@@ -42,6 +42,14 @@ def run_self_test() -> int:
         if "LD_PRELOAD" in external:
             raise RuntimeError("clean_external_env leaked LD_PRELOAD")
 
+    # Saved login needs a real OS keyring backend bundled (not the fail one).
+    # Linux CI has no Secret Service daemon, so only check where it's built in.
+    if sys.platform in ("win32", "darwin"):
+        import keyring
+        from keyring.backends import fail
+        if isinstance(keyring.get_keyring(), fail.Keyring):
+            raise RuntimeError("No OS keyring backend available")
+
     app = QApplication.instance() or QApplication([])
     if logo().isNull():
         raise RuntimeError("Application icon could not be loaded")
@@ -102,6 +110,6 @@ def run_self_test() -> int:
 
     print(json.dumps({
         "ok": True,
-        "checks": ["qt", "assets", "external_env", "rest", "mcp_initialize", "mcp_tools"],
+        "checks": ["qt", "assets", "external_env", "keyring", "rest", "mcp_initialize", "mcp_tools"],
     }))
     return 0

@@ -166,3 +166,17 @@ def test_download_returns_none_when_file_downloads_fail(tmp_path):
 
     assert result is None
     assert synced_courses == []
+
+
+def test_all_ticked_is_stored_as_all(qtbot):
+    from blackboard_sync.qt.dialogs import CourseSelectionDialog
+    courses = [{"id": "_1_1", "name": "A"}, {"id": "_2_1", "name": "B"}]
+
+    dlg = CourseSelectionDialog(courses, [], {})
+    qtbot.addWidget(dlg)
+    # all ticked -> [] so next semester's courses sync too
+    assert dlg.result_ids == []
+
+    dlg = CourseSelectionDialog(courses, ["_2_1"], {})
+    qtbot.addWidget(dlg)
+    assert dlg.result_ids == ["_2_1"]

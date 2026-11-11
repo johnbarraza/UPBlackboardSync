@@ -174,6 +174,16 @@ _TOOLS: list[dict] = [
             "required": ["course_id"],
         },
     },
+    {
+        "name": "blackboard_overview",
+        "description": (
+            "Snapshot of the local download folder (same data as the "
+            "BlackboardSync.html dashboard): courses with file/announcement "
+            "counts and last update, the newest materials across all courses, "
+            "and all locally saved announcements, newest first."
+        ),
+        "inputSchema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -203,6 +213,7 @@ class _Handler(BaseHTTPRequestHandler):
     get_course_status: Callable[[str], dict]
     get_roster: Callable[[str], list]
     get_recent: Callable[[], list]
+    get_overview: Callable[[], dict]
     bridge: MCPBridge
 
     def log_message(self, fmt: str, *args: Any) -> None:
@@ -357,6 +368,8 @@ class _Handler(BaseHTTPRequestHandler):
             return text(json.dumps(roster, default=str, indent=2))
         elif name == "blackboard_recent":
             return text(json.dumps(self.get_recent(), default=str, indent=2))
+        elif name == "blackboard_overview":
+            return text(json.dumps(self.get_overview(), default=str, indent=2))
         else:
             return {
                 "isError": True,
@@ -383,6 +396,7 @@ class MCPServer:
         get_recent: Callable[[], list],
         bridge: MCPBridge,
         port: int | None = None,
+        get_overview: Callable[[], dict] = dict,
     ) -> None:
         self._port = (
             int(os.environ.get("BBSYNC_MCP_PORT", DEFAULT_PORT))
@@ -400,6 +414,7 @@ class MCPServer:
                 "get_course_status": staticmethod(get_course_status),
                 "get_roster": staticmethod(get_roster),
                 "get_recent": staticmethod(get_recent),
+                "get_overview": staticmethod(get_overview),
                 "bridge": bridge,
             },
         )

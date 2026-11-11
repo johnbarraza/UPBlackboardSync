@@ -31,6 +31,8 @@ from .updates import check_for_updates
 from .qt.manager import UIManager
 from .qt.dialogs import DiagnosticsDialog
 from .mcp_server import MCPBridge, MCPServer
+from .dashboard import DASHBOARD_NAME, build_index, write_dashboard
+from . import credentials
 
 
 logger = logging.getLogger(__name__)
@@ -65,6 +67,7 @@ class SyncController:
             get_course_status=self._mcp_get_course_status,
             get_roster=self._mcp_get_roster,
             get_recent=self._mcp_get_recent,
+            get_overview=self._mcp_get_overview,
             bridge=self._mcp_bridge,
             port=self.model.mcp_port,
         )
@@ -85,6 +88,10 @@ class SyncController:
     def _on_auth_required(self) -> None:
         """Called from sync thread when session expires unexpectedly."""
         self._auth_required = True
+        if credentials.load() is not None:
+            # queued to the Qt thread; the login page autofills and the
+            # sync resumes on login_complete
+            self._mcp_bridge.open_login_requested.emit()
 
     def _mcp_open_login(self) -> None:
         if self.model.university is not None:
@@ -343,6 +350,23 @@ class SyncController:
         except Exception:
             return []
 
+    def _mcp_get_overview(self) -> dict:
+        loc = self.model.download_location
+        if not loc or not loc.exists():
+            return {"error": "download location not set or missing"}
+        data = build_index(loc)
+        for c in data["courses"]:
+            c.pop("tree", None)  # too big for an LLM; use blackboard_course_files
+        return data
+
+    def open_dashboard(self) -> None:
+        loc = self.model.download_location
+        if loc:
+            path = loc / DASHBOARD_NAME
+            if not path.exists():
+                write_dashboard(loc)
+            self.ui.open_file(path)
+
     def _mcp_get_course_status(self, course_id: str) -> dict:
         courses = self.model.list_available_courses()
         course = next((c for c in courses if c.id == course_id), None)
@@ -394,6 +418,7 @@ class SyncController:
         self.ui.config_window.signals.open_diagnostics.connect(self._open_diagnostics)
         self.ui.signals.open_tray.connect(self.open_tray)
         self.ui.signals.open_downloads.connect(self.open_downloads)
+        self.ui.signals.open_dashboard.connect(self.open_dashboard)
         self.ui.signals.open_menu.connect(self.open_menu)
         self.ui.signals.setup.connect(self.setup)
         self.ui.signals.config.connect(self.config)
@@ -473,7 +498,9 @@ class SyncController:
         self.model.backup_location = backup_location
         self.model.drive_enabled = drive_enabled
         self.model.drive_credentials_path = drive_credentials_path
-        self.model.selected_course_ids = selected_course_ids
+        if set(selected_course_ids) != set(self.model.selected_course_ids):
+            self.model.selected_course_ids = selected_course_ids
+            self.model.force_sync()  # don't wait up to 30 min
 
         mcp_changed = (mcp_enabled != self.model.mcp_enabled
                        or mcp_port != self.model.mcp_port)
@@ -490,6 +517,7 @@ class SyncController:
                 get_course_status=self._mcp_get_course_status,
                 get_roster=self._mcp_get_roster,
                 get_recent=self._mcp_get_recent,
+                get_overview=self._mcp_get_overview,
                 bridge=self._mcp_bridge,
                 port=mcp_port,
             )

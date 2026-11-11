@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-11-11
+
+### Added
+- `BlackboardSync.html` dashboard regenerated after every sync in the download folder: latest announcements, newest materials, and per-course folder tree (offline, links to local files). Tray menu → "Open dashboard".
+- MCP tool `blackboard_overview`: same snapshot as the dashboard (courses, newest materials, announcements).
+- Optional automatic login (Settings → "Inicio de sesión automático"): username/password kept in the OS credential store via `keyring` (Windows Credential Manager), never in the config file. The login page is auto-filled only on the university's own host, once per attempt; an expired session reopens the login and resumes syncing.
+- Login no longer asked on every start: Blackboard's session cookies (no expiry) are now kept by the login browser profile.
+- Course selection: ticking all courses stores "all", so next semester's courses sync too; saving a new selection syncs right away; selection dialog and Settings labels in Spanish.
+- Single instance: a second launch shows "BlackboardSync ya está abierto" instead of starting another copy (two copies fought over the WebEngine profile and froze).
+- Dashboard: announcements grouped by course; dates as `dd/mm/aaaa h:mm AM/PM` with "hoy"/"ayer"; per-course "Último publicado" from the whole course.
+
+### Fixed
+- Ultra embedded files were saved as `xid-24187548_1/xid-24187548_1.pdf`: the real name is now read from the link's `data-bbfile` JSON (`displayName`), and file-only items are saved directly in their folder without the wrapper `.html`/subfolder.
+- Files with a known extension but generic MIME (`Table1.do`, `data.dta`, `.docx`) no longer get `.bin` appended/swapped in.
+- Downloaded files now carry the Blackboard posting date (`created`, the day the teacher posted it) as their modification date (download date stays as creation date). Recent activity, `recent.md` and the dashboard distinguish "publicado" vs "descargado"; "NUEVO" is based on the posting date.
+
 ## [1.3.7] - 2026-08-28
 
 ### Fixed

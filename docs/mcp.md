@@ -41,7 +41,7 @@ Full snapshot of the app state. Good for polling every 30–60 s.
 
 ```json
 {
-  "version": "1.3.7",
+  "version": "1.3.8",
   "logged_in": true,
   "syncing": true,
   "active": true,
@@ -307,6 +307,35 @@ Files downloaded in the last 4 hours across all syncs. No API call — reads the
 ```
 
 > Use this instead of `blackboard_files` to quickly answer "what just synced?" without scanning the whole directory tree. Also written as a human-readable `recent.md` in the download folder root.
+
+---
+
+### `blackboard_overview`
+Snapshot of the local download folder — the same data shown in the `BlackboardSync.html` dashboard. No API call.
+
+```json
+{
+  "generated": "2026-11-11T05:32:44+00:00",
+  "root": "C:\Users\me\Blackboard",
+  "courses": [
+    { "name": "Microeconomía II", "year": "2026", "file_count": 4, "size": 499712,
+      "last_modified": "2026-11-11T05:32:44+00:00", "announcement_count": 1 }
+  ],
+  "recent": [
+    { "name": "Sílabo.pdf", "path": "2026/Microeconomía II/Semana 1/Sílabo.pdf",
+      "size": 51200, "mtime": "2026-11-11T05:32:44+00:00", "course": "Microeconomía II" }
+  ],
+  "announcements": [
+    { "title": "Cambio de horario PC2", "date": "2026-11-14", "course": "Microeconomía II",
+      "body": "…", "path": "2026/Microeconomía II/Announcements/2026-11-14 - Cambio de horario PC2.md" }
+  ]
+}
+```
+
+> `recent` = newest 80 files (by modification time). Announcements come from the local `Announcements/*.md` files.
+
+## Dashboard (`BlackboardSync.html`)
+After every sync an offline, self-contained `BlackboardSync.html` is (re)written in the download folder root: latest announcements and materials, plus a per-course folder tree with direct links to the local files. Tray menu → **Open dashboard**.
 
 ---
 

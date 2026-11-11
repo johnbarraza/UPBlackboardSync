@@ -1,15 +1,38 @@
+import os
+import re
+import time
 import logging
 from pathlib import Path
+from datetime import datetime
 from requests import Response
 
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
+# Files written during the current sync as (path, download timestamp).
+# ponytail: module-global, fine while only one sync runs at a time.
+written: list[tuple[Path, float]] = []
+
+
+def has_extension(name: str) -> bool:
+    """True if name ends in a real-looking extension (.pdf, .do, .xlsx)."""
+    return re.search(r'\.[A-Za-z0-9]{1,5}$', name) is not None
+
+
+def _finish(path: Path, posted: datetime | None) -> None:
+    """Record the download and stamp mtime with the Blackboard date."""
+    now = time.time()
+    written.append((path, now))
+    if posted is not None:
+        os.utime(path, (now, posted.timestamp()))
+
 
 class BStream:
     """Base class for content that can be downloaded as a byte stream."""
     CHUNK_SIZE = 8192  # Increased from 1024 to 8KB for better performance
+    # When the item was posted/updated in Blackboard; becomes file mtime.
+    posted: datetime | None = None
 
     def write_base(self, path: Path, executor: ThreadPoolExecutor,
                    stream: Response) -> None:
@@ -45,12 +68,14 @@ class BStream:
                     except Exception:
                         pass
                 raise
+            _finish(path, self.posted)
 
         executor.submit(_write)
 
 
 class FStream:
     """Base class for content that can be written as text."""
+    posted: datetime | None = None
 
     def write_base(self, path: Path, executor: ThreadPoolExecutor,
                    body: str) -> None:
@@ -64,5 +89,6 @@ class FStream:
 
             with path.open('w', encoding='utf-8') as f:
                 f.write(body)
+            _finish(path, self.posted)
 
         executor.submit(_write)

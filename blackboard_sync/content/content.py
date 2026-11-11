@@ -28,7 +28,8 @@ class Content:
     def __init__(self, content: BBCourseContent, api_path: BBContentPath,
                  job: DownloadJob) -> None:
 
-        logger.info(f"{content.title}[{content.contentHandler}]")
+        logger.info(f"{content.title}[{content.contentHandler}] "
+                    f"created={content.created} modified={content.modified}")
 
         self.body = None
         self.handler = None
@@ -102,8 +103,12 @@ class Content:
             self.handler.write(path, executor)
 
         if self.body is not None:
-            path.mkdir(exist_ok=True, parents=True)
-            self.body.write(path, executor)
+            if self.body.file_only:
+                # no '<title>/' subfolder for a lone embedded file
+                self.body.write(path.parent, executor)
+            else:
+                path.mkdir(exist_ok=True, parents=True)
+                self.body.write(path, executor)
 
     @staticmethod
     def should_download(content: BBCourseContent, job: DownloadJob) -> bool:

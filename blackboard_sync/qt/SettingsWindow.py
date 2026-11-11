@@ -22,11 +22,12 @@ from datetime import datetime
 from PyQt6.QtCore import pyqtSlot, pyqtSignal, QObject
 from PyQt6.QtWidgets import QWidget, QLabel
 from PyQt6.QtWidgets import (QComboBox, QPushButton, QDialogButtonBox,
-                             QCheckBox, QSpinBox)
+                             QCheckBox, QSpinBox, QLineEdit, QBoxLayout)
 
 from .assets import load_ui
 from .dialogs import DirDialog, FileDialog, CourseSelectionDialog
 from blackboard_sync.__about__ import __title__, __uri__
+from blackboard_sync import credentials
 
 
 class SettingsWindow(QWidget):
@@ -81,6 +82,7 @@ class SettingsWindow(QWidget):
         self.mcp_port_input: QSpinBox
         self.mcp_port_label: QLabel
         self.mcp_hint: QLabel
+        self.mcp_label: QLabel
 
         self.signals = self.Signals()
         self._data_source = ""
@@ -118,6 +120,65 @@ class SettingsWindow(QWidget):
 
         if self._drive_coming_soon:
             self._apply_drive_coming_soon()
+
+        self._init_saved_login()
+
+    def _init_saved_login(self) -> None:
+        """Opt-in 'remember my login' section, added under MCP."""
+        self.save_login = QCheckBox(self.tr(
+            "Save username and password to log in again automatically"))
+        self.login_user = QLineEdit()
+        self.login_user.setPlaceholderText(self.tr("Username"))
+        self.login_password = QLineEdit()
+        self.login_password.setEchoMode(QLineEdit.EchoMode.Password)
+        hint = QLabel(self.tr(
+            "Stored encrypted in the system credential manager, never in "
+            "the config file. Untick to delete it."))
+        hint.setWordWrap(True)
+        hint.setFont(self.mcp_hint.font())
+        title = QLabel(self.tr("Automatic login"))
+        title.setFont(self.mcp_label.font())
+
+        # the (nested) layout that holds the MCP section
+        layout = next(lay for lay in self.findChildren(QBoxLayout)
+                      if lay.indexOf(self.mcp_hint) >= 0)
+        at = layout.indexOf(self.mcp_hint) + 1
+        layout.insertSpacing(at, 16)
+        at += 1
+        for i, w in enumerate((title, self.save_login, self.login_user,
+                               self.login_password, hint)):
+            layout.insertWidget(at + i, w)
+
+        self.save_login.toggled.connect(self.login_user.setEnabled)
+        self.save_login.toggled.connect(self.login_password.setEnabled)
+        self.button_box.accepted.connect(self._store_login)
+        self.load_saved_login()
+
+    def load_saved_login(self) -> None:
+        saved = credentials.load()
+        self.save_login.setChecked(saved is not None)
+        self.login_user.setEnabled(saved is not None)
+        self.login_password.setEnabled(saved is not None)
+        self.login_user.setText(saved[0] if saved else "")
+        # never put the stored password back on screen
+        self.login_password.clear()
+        self.login_password.setPlaceholderText(
+            self.tr("Saved — type to change") if saved
+            else self.tr("Password"))
+
+    @pyqtSlot()
+    def _store_login(self) -> None:
+        if not self.save_login.isChecked():
+            credentials.clear()
+            return
+        user = self.login_user.text().strip()
+        password = self.login_password.text()
+        if not password:  # keep the saved one unless a new one was typed
+            saved = credentials.load()
+            password = saved[1] if saved else ""
+        if user and password:
+            credentials.save(user, password)
+        self.load_saved_login()
 
     def _apply_drive_coming_soon(self) -> None:
         """Disable the Google Drive section and mark it as coming soon."""
@@ -179,7 +240,7 @@ class SettingsWindow(QWidget):
             self
         )
         if dialog.exec():
-            self._selected_course_ids = dialog.selected_course_ids
+            self._selected_course_ids = dialog.result_ids
             self._update_course_selection_hint()
 
     @property
@@ -354,8 +415,9 @@ class SettingsWindow(QWidget):
             return
 
         if selected >= total:
-            self.selected_courses_hint.setText(f"All courses ({total})")
+            self.selected_courses_hint.setText(
+                self.tr("All courses (%1)").replace("%1", str(total)))
         else:
             self.selected_courses_hint.setText(
-                f"Selected courses: {selected}/{total}"
-            )
+                self.tr("Selected courses: %1/%2")
+                .replace("%1", str(selected)).replace("%2", str(total)))

@@ -4,6 +4,8 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 from pathvalidate import sanitize_filename
 
+from .base import _finish
+
 
 class Announcement:
     def __init__(self, data: dict):
@@ -52,3 +54,4 @@ class Announcement:
         )
 
         filepath.write_text(content, encoding="utf-8")
+        _finish(filepath, self.created)

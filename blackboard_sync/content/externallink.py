@@ -14,6 +14,7 @@ class ExternalLink(FStream):
     def __init__(self, content: BBCourseContent, _: None,
                  job: DownloadJob) -> None:
         self.url = None
+        self.posted = content.created or content.modified
 
         if content.contentHandler is not None:
             self.url = content.contentHandler.url
