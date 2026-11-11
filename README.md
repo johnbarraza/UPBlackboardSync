@@ -6,6 +6,16 @@ Repositorio original: https://github.com/sanjacob/BlackboardSync
 Mantenimiento local para uso en Universidad del Pacifico (Peru).
 Licencia: GPL-2.0 (se mantiene la licencia del proyecto original).
 
+<p align="center">
+  <a href="https://github.com/johnbarraza/UPBlackboardSync/releases/latest">
+    <img alt="Descargar para Windows" src="https://img.shields.io/github/v/release/johnbarraza/UPBlackboardSync?label=Descargar%20para%20Windows&logo=windows&style=for-the-badge&color=0078D4">
+  </a>
+</p>
+
+En el release descarga `BlackboardSync-VERSION-Setup.exe` (instalador) o
+`BlackboardSync.exe` (portable). Si Windows muestra SmartScreen: "Más
+información" → "Ejecutar de todas formas".
+
 ## Distribucion
 
 Este proyecto publica dos tipos de archivos:
