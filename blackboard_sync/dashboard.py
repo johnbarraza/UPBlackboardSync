@@ -32,7 +32,11 @@ def _tree(folder: Path, root: Path, files_out: list[dict]) -> dict:
     for e in entries:
         if e.name.startswith(".") or e.name in _SKIP_FILES:
             continue
-        if e.is_dir():
+        try:
+            is_dir = e.is_dir()
+        except OSError:  # e.g. WinError 1920 on WSL/broken links
+            continue
+        if is_dir:
             if e.name in _SPECIAL_DIRS:
                 continue
             node["dirs"].append(_tree(e, root, files_out))

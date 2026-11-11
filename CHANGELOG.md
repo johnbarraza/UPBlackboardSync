@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Choosing the download folder (Setup / Settings) saved the folder the dialog was browsing (the app's working directory) instead of the one picked.
+- Dashboard no longer fails when the download folder contains unreadable entries (WinError 1920).
+
 ## [1.3.8] - 2026-11-11
 
 ### Added

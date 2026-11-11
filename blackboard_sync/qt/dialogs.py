@@ -49,8 +49,10 @@ class DirDialog(QFileDialog):
 
     def choose(self) -> Path | None:
         self.setFileMode(QFileDialog.FileMode.Directory)
-        if super().exec():
-            return Path(self.directory().path())
+        if super().exec() and self.selectedFiles():
+            # directory() is the folder being browsed (starts at the CWD),
+            # not the one picked; it saved the app's own folder as target.
+            return Path(self.selectedFiles()[0])
         return None
 
 
