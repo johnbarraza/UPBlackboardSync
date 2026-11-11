@@ -6,7 +6,8 @@
 
 # Installer File and Name
 Name "{{ title }}"
-Outfile "..\dist\BlackboardSync-${VERSION}-Setup.exe"
+; Fixed name so README can link releases/latest/download/BlackboardSync-Setup.exe
+Outfile "..\dist\BlackboardSync-Setup.exe"
 Unicode True
 
 # Installation Dir
