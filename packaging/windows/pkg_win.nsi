@@ -15,7 +15,7 @@ InstallDirRegKey HKCU "Software\{{ title }}" "InstallDir"
 # Request Privileges
 RequestExecutionLevel user
 
-!define SYNC_FILE "..\dist\BlackboardSync\*"
+!define SYNC_FILE "..\dist\BlackboardSync.exe"
 !define SYNC_EXE "$INSTDIR\BlackboardSync.exe"
 !define SYNC_ICON "$INSTDIR\icon.ico"
 !define APP_DATA_DIR "$APPDATA\BlackboardSync"
