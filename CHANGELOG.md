@@ -6,7 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Clicking the "update available" toast downloads the latest installer (Windows) / opens the release page.
+
 ### Fixed
+- Installer closes a running BlackboardSync before replacing the exe, so updating in place no longer fails with "file in use". Settings, downloads and saved login are kept.
 - Choosing the download folder (Setup / Settings) saved the folder the dialog was browsing (the app's working directory) instead of the one picked.
 - Dashboard no longer fails when the download folder contains unreadable entries (WinError 1920).
 

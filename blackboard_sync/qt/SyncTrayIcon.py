@@ -15,6 +15,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
+import sys
 from datetime import datetime
 import webbrowser
 
@@ -134,8 +135,19 @@ class SyncTrayIcon(QSystemTrayIcon):
     def __init__(self) -> None:
         super().__init__()
         self.signals = self.Signals()
+        self._last_event: Event | None = None
+        self.messageClicked.connect(self._on_message_clicked)
 
         self._init_ui()
+
+    def _on_message_clicked(self) -> None:
+        # "Update available" toast → download the installer (Windows) or
+        # open the release page; installing over the old one keeps settings.
+        if self._last_event is Event.UPDATE_AVAILABLE:
+            latest = f"{__uri__}/releases/latest"
+            if sys.platform == "win32":
+                latest += "/download/BlackboardSync-Setup.exe"
+            webbrowser.open(latest)
 
     def _init_ui(self) -> None:
         # Create the tray
@@ -175,6 +187,7 @@ class SyncTrayIcon(QSystemTrayIcon):
         self.setToolTip(self._menu._status.text())
 
     def notify(self, evt: Event) -> None:
+        self._last_event = evt
         title, msg, icon, duration = self._messages.get_msg(evt)
         self._show_msg(title, msg, icon, duration)
 

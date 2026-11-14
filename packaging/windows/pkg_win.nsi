@@ -54,6 +54,12 @@ RequestExecutionLevel user
 
 # default section start; every NSIS script has at least one section.
 Section "Installation" SecInstall
+    ; Update in place: close a running copy so its exe can be replaced.
+    ; Settings (%APPDATA%\BlackboardSync), downloads and saved login are kept.
+    nsExec::Exec 'taskkill /F /IM BlackboardSync.exe'
+    Pop $0
+    Sleep 1500
+
     SetOutPath "$INSTDIR"
     File /r ${SYNC_FILE}
     File "icon.ico"
