@@ -392,8 +392,8 @@
     </message>
     <message>
         <location filename="../notification.py" line="72"/>
-        <source>Your Blackboard session expired. Click the tray icon to log in. Tip: Settings &gt; Automatic login reconnects on its own.</source>
-        <translation>Tu sesión de Blackboard venció. Haz clic en el ícono de la bandeja para iniciar sesión. Consejo: Configuración &gt; Inicio de sesión automático reconecta solo.</translation>
+        <source>Your Blackboard session expired. Click here to log in. Tip: Settings &gt; Automatic login reconnects on its own.</source>
+        <translation>Tu sesión de Blackboard venció. Haz clic aquí para iniciar sesión. Consejo: Configuración &gt; Inicio de sesión automático reconecta solo.</translation>
     </message>
 </context>
 <context>

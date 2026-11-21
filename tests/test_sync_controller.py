@@ -100,8 +100,18 @@ def test_log_in_failure_notifies_error():
 
     SyncController.log_in(controller, cookies=mock.Mock())
 
-    controller.ui.notify_login_error.assert_called_once()
+    controller.ui.notify_login_error.assert_called_once_with(clear_cookies=True)
     controller.model.start_sync.assert_not_called()
+
+
+def test_log_in_network_failure_keeps_cookies():
+    controller = make_controller()
+    controller.model.auth.return_value = False
+    controller.model.last_error = "network"
+
+    SyncController.log_in(controller, cookies=mock.Mock())
+
+    controller.ui.notify_login_error.assert_called_once_with(clear_cookies=False)
 
 
 def test_auth_required_reopens_login_without_saved_credentials():
@@ -126,13 +136,13 @@ def test_auth_required_reopens_login_without_saved_credentials():
 
 def test_auth_alert_notifies_then_repeats_slowly():
     controller = make_controller()
-    controller._auth_required = True
+    controller.model.is_logged_in = False  # expired, or startup login pending
 
     SyncController._auth_alert_due(controller)
 
     controller.ui.notify_auth_required.assert_called_once()
     controller._auth_alert.setInterval.assert_called_once()
 
-    controller._auth_required = False
+    controller.model.is_logged_in = True
     SyncController._auth_alert_due(controller)
     controller._auth_alert.stop.assert_called_once()

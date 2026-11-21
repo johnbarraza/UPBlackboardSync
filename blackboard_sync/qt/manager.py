@@ -106,6 +106,7 @@ class UIManager(QObject):
         self.tray.signals.open_dir.connect(self.signals.open_downloads)
         self.tray.signals.open_dashboard.connect(self.signals.open_dashboard)
         self.tray.signals.quit.connect(self.signals.quit)
+        self.tray.signals.log_in.connect(self.signals.reconnect)
         self.tray.signals.reset_setup.connect(self.slot_open_setup)
         self.tray.activated.connect(self.slot_open_tray)
         self.tray.signals.quit.connect(self.slot_quit)
@@ -296,9 +297,11 @@ class UIManager(QObject):
     def notify_running(self) -> None:
         self.tray.notify(Event.APP_RUNNING)
 
-    def notify_login_error(self) -> None:
+    def notify_login_error(self, clear_cookies: bool = True) -> None:
         self.dialogs.login_error_dialog(self.help_uri)
-        self.login_window.restore()
+        # keep cookies on network errors: a live SSO cookie can still log in
+        if clear_cookies:
+            self.login_window.restore()
         self.show(self.login_window)
 
     def notify_auth_required(self) -> None:

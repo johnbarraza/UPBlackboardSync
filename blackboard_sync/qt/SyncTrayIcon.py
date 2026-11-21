@@ -131,6 +131,7 @@ class SyncTrayIcon(QSystemTrayIcon):
         open_dir = pyqtSignal()
         open_dashboard = pyqtSignal()
         show_menu = pyqtSignal()
+        log_in = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -148,6 +149,8 @@ class SyncTrayIcon(QSystemTrayIcon):
             if sys.platform == "win32":
                 latest += "/download/BlackboardSync-Setup.exe"
             webbrowser.open(latest)
+        elif self._last_event is Event.AUTH_REQUIRED:
+            self.signals.log_in.emit()
 
     def _init_ui(self) -> None:
         # Create the tray

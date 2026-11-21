@@ -142,10 +142,13 @@ class BlackboardSync:
             # should trigger exception if not authenticated
             u_sess.fetch_users(user_id='me')
         except (BBUnauthorizedError, BBForbiddenError):
+            self.last_error = "auth"
             logger.warning("Credentials are incorrect")
         except RequestException:
+            self.last_error = "network"
             logger.warning("Error while making auth request")
         else:
+            self.last_error = None
             logger.info("Logged in successfully")
             self.sess = u_sess
             self._is_logged_in = True

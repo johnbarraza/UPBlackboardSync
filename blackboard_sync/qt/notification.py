@@ -70,8 +70,8 @@ class TrayMessages(QObject):
             ),
             Event.AUTH_REQUIRED: SyncTrayMsg(
                 self.tr('Log in to keep syncing'),
-                self.tr('Your Blackboard session expired. Click the tray '
-                        'icon to log in. Tip: Settings > Automatic login '
+                self.tr('Your Blackboard session expired. Click here to '
+                        'log in. Tip: Settings > Automatic login '
                         'reconnects on its own.'),
                 Severity.WARNING.value, Duration.LONG
             )

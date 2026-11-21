@@ -93,6 +93,8 @@ class SyncController:
 
         if not first_time:
             self.open_login()
+            # reboot with a dead SSO cookie: nobody may be watching the window
+            self._auth_alert.start(AUTH_FIRST_ALERT_MS)
 
         self.init_signals()
         self.ui.start(first_time)
@@ -123,10 +125,10 @@ class SyncController:
             self._auth_alert.start(AUTH_FIRST_ALERT_MS)
 
     def _auth_alert_due(self) -> None:
-        if not self._auth_required:
+        if self.model.is_logged_in:
             self._auth_alert.stop()
             return
-        logger.warning("Still waiting for login since %s",
+        logger.warning("Still waiting for login (session expired since %s)",
                        self._auth_required_since)
         self.ui.notify_auth_required()
         self._auth_alert.setInterval(AUTH_REPEAT_ALERT_MS)
@@ -589,7 +591,8 @@ class SyncController:
             self.ui.notify_running()
             self.check_for_updates()
         else:
-            self.ui.notify_login_error()
+            self.ui.notify_login_error(
+                clear_cookies=self.model.last_error != "network")
 
     def log_out(self) -> None:
         if self.model.is_active:

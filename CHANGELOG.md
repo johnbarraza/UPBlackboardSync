@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.11] - 2026-11-21
+
+### Fixed
+- Login reminder also fires when the app starts without a live session (e.g. reboot with an expired SSO cookie), not only after a 401 during sync.
+- Clicking the "Log in to keep syncing" notification opens the login.
+- A network error while logging in no longer wipes the login cookies, so the SSO cookie can still reconnect.
+
 ## [1.3.10] - 2026-11-21
 
 ### Fixed
