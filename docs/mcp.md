@@ -41,11 +41,13 @@ Full snapshot of the app state. Good for polling every 30–60 s.
 
 ```json
 {
-  "version": "1.3.9",
+  "version": "1.3.10",
   "logged_in": true,
   "syncing": true,
   "active": true,
   "auth_required": false,
+  "auth_required_since": null,
+  "last_error": null,
   "current_course": "Cálculo Diferencial 2026",
   "last_sync": "2026-08-09T14:30:00+00:00",
   "next_sync": "2026-08-09T15:00:00+00:00",

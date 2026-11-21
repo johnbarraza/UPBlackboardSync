@@ -3,6 +3,9 @@
 """BlackboardSync Controller."""
 
 import logging
+from datetime import datetime, timedelta, timezone
+
+from PyQt6.QtCore import QTimer
 
 # Copyright (C) 2024, Jacob Sánchez Pérez
 
@@ -32,10 +35,16 @@ from .qt.manager import UIManager
 from .qt.dialogs import DiagnosticsDialog
 from .mcp_server import MCPBridge, MCPServer
 from .dashboard import DASHBOARD_NAME, build_index, write_dashboard
-from . import credentials
 
 
 logger = logging.getLogger(__name__)
+
+# Remind every 6 h while the session stays expired; first reminder after
+# 10 min gives the cookie/autofill reconnect time to finish.
+AUTH_FIRST_ALERT_MS = 10 * 60 * 1000
+AUTH_REPEAT_ALERT_MS = 6 * 60 * 60 * 1000
+# A session that 401s right after relogin must not reopen the login forever.
+AUTH_REOPEN_COOLDOWN = timedelta(minutes=10)
 
 
 class SyncController:
@@ -49,7 +58,11 @@ class SyncController:
 
         # Tracks whether session expired and re-login is needed
         self._auth_required = False
+        self._auth_required_since: datetime | None = None
+        self._last_auto_login: datetime | None = None
         self.model._auth_required_callback = self._on_auth_required
+        self._auth_alert = QTimer()
+        self._auth_alert.timeout.connect(self._auth_alert_due)
 
         # MCP bridge dispatches HTTP-thread signals to Qt main thread
         self._mcp_bridge = MCPBridge()
@@ -57,6 +70,7 @@ class SyncController:
         self._mcp_bridge.sync_course_requested.connect(self._mcp_sync_course)
         self._mcp_bridge.open_login_requested.connect(self._mcp_open_login)
         self._mcp_bridge.restart_sync_requested.connect(self._restart_sync)
+        self._mcp_bridge.auth_required.connect(self._handle_auth_required)
 
         self._mcp_server = MCPServer(
             get_status=self._mcp_get_status,
@@ -88,10 +102,34 @@ class SyncController:
     def _on_auth_required(self) -> None:
         """Called from sync thread when session expires unexpectedly."""
         self._auth_required = True
-        if credentials.load() is not None:
-            # queued to the Qt thread; the login page autofills and the
-            # sync resumes on login_complete
-            self._mcp_bridge.open_login_requested.emit()
+        if self._auth_required_since is None:
+            self._auth_required_since = datetime.now(timezone.utc)
+        # queued to the Qt thread
+        self._mcp_bridge.auth_required.emit()
+
+    def _handle_auth_required(self) -> None:
+        """Qt thread: try to reconnect, remind the user if that fails.
+
+        Opening the login always helps: a live SSO cookie redirects straight
+        to the target page, a saved login autofills; otherwise the window
+        stays up for the user. login_complete resumes the sync.
+        """
+        now = datetime.now(timezone.utc)
+        if (self._last_auto_login is None
+                or now - self._last_auto_login > AUTH_REOPEN_COOLDOWN):
+            self._last_auto_login = now
+            self._mcp_open_login()
+        if not self._auth_alert.isActive():
+            self._auth_alert.start(AUTH_FIRST_ALERT_MS)
+
+    def _auth_alert_due(self) -> None:
+        if not self._auth_required:
+            self._auth_alert.stop()
+            return
+        logger.warning("Still waiting for login since %s",
+                       self._auth_required_since)
+        self.ui.notify_auth_required()
+        self._auth_alert.setInterval(AUTH_REPEAT_ALERT_MS)
 
     def _mcp_open_login(self) -> None:
         if self.model.university is not None:
@@ -132,6 +170,9 @@ class SyncController:
             "syncing": self.model.is_syncing,
             "active": self.model.is_active,
             "auth_required": self._auth_required,
+            "auth_required_since": (self._auth_required_since.isoformat()
+                                    if self._auth_required_since else None),
+            "last_error": self.model.last_error,
             "current_course": current_course,
             "last_sync": last.isoformat() if last else None,
             "next_sync": nxt.isoformat() if nxt else None,
@@ -530,6 +571,8 @@ class SyncController:
     def log_in(self, cookies: RequestsCookieJar) -> None:
         if self.model.auth(cookies, start_sync=False):
             self._auth_required = False
+            self._auth_required_since = None
+            self._auth_alert.stop()
             if self._pending_setup_course_selection:
                 courses = self.model.list_available_courses_summary()
                 selected = self.ui.ask_course_selection(

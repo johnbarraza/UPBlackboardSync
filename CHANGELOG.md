@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.10] - 2026-11-21
+
+### Fixed
+- Expired session now always reopens the login, even without a saved login: a live SSO cookie reconnects on its own. Reopen capped to once per 10 min (no loop).
+- Session expired after a network outage is logged as inactivity ("no network since HH:MM") instead of "logged in from another location".
+
+### Added
+- Tray notification after 10 min without login, repeated every 6 h until logged in.
+- MCP/REST status exposes `auth_required_since` and `last_error` (`network`/`auth`).
+
 ## [1.3.9] - 2026-11-14
 
 ### Added

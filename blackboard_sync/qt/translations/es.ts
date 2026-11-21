@@ -385,6 +385,16 @@
         <source>Click the tray icon to manage your downloads</source>
         <translation>Puedes gestionar tus descargas desde la bandeja</translation>
     </message>
+    <message>
+        <location filename="../notification.py" line="71"/>
+        <source>Log in to keep syncing</source>
+        <translation>Inicia sesión para seguir sincronizando</translation>
+    </message>
+    <message>
+        <location filename="../notification.py" line="72"/>
+        <source>Your Blackboard session expired. Click the tray icon to log in. Tip: Settings &gt; Automatic login reconnects on its own.</source>
+        <translation>Tu sesión de Blackboard venció. Haz clic en el ícono de la bandeja para iniciar sesión. Consejo: Configuración &gt; Inicio de sesión automático reconecta solo.</translation>
+    </message>
 </context>
 <context>
     <name>CourseSelectionDialog</name>

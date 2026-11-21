@@ -82,6 +82,11 @@ class BlackboardSync:
 
         # Called (from sync thread) when session expires unexpectedly
         self._auth_required_callback: Callable[[], None] | None = None
+        # First network failure of the current outage; tells an inactivity
+        # timeout apart from a real logout elsewhere.
+        self._offline_since: datetime | None = None
+        # "network" / "auth" / None, exposed through MCP status
+        self.last_error: str | None = None
 
         logger.debug("Initialising BlackboardSync")
 
@@ -187,17 +192,28 @@ class BlackboardSync:
 
         try:
             start_time = self._download.download()
+            self._offline_since = None
+            self.last_error = None
             if (start_time is None
                     and self._download is not None
                     and not self._download.cancelled):
                 self.schedule_next_sync(datetime.now(timezone.utc))
         except BBUnauthorizedError:
-            logger.warning("Session expired - please log in again from the application")
-            logger.info("Your session may have expired because you logged in from another location (browser, mobile app, etc.)")
+            self.last_error = "auth"
+            if self._offline_since is not None:
+                since = self._offline_since.astimezone().strftime("%H:%M")
+                logger.warning("Session expired from inactivity (no network since %s)", since)
+            else:
+                logger.warning("Session expired - please log in again from the application")
+                logger.info("Your session may have expired because you logged in from another location (browser, mobile app, etc.)")
+            self._offline_since = None
             self.log_out()
             if self._auth_required_callback is not None:
                 self._auth_required_callback()
         except (RequestException) as e:
+            self.last_error = "network"
+            if self._offline_since is None:
+                self._offline_since = datetime.now(timezone.utc)
             logger.warning(f"Network error during sync: {type(e).__name__}")
             logger.info("The sync will be retried automatically on the next scheduled sync")
             # Don't mark as permanent error, just postpone

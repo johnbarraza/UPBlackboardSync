@@ -301,6 +301,9 @@ class UIManager(QObject):
         self.login_window.restore()
         self.show(self.login_window)
 
+    def notify_auth_required(self) -> None:
+        self.tray.notify(Event.AUTH_REQUIRED)
+
     def notify_sync_error(self) -> None:
         self.tray.notify(Event.DOWNLOAD_ERROR)
 

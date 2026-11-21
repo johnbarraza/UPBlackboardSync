@@ -26,6 +26,7 @@ class Event(Enum):
     UPDATE_AVAILABLE = auto()
     DOWNLOAD_ERROR = auto()
     APP_RUNNING = auto()
+    AUTH_REQUIRED = auto()
 
 
 class Severity(Enum):
@@ -66,6 +67,13 @@ class TrayMessages(QObject):
                 self.tr('The app is running in the background'),
                 self.tr('Click the tray icon to manage your downloads'),
                 Severity.INFORMATION.value, Duration.LONG
+            ),
+            Event.AUTH_REQUIRED: SyncTrayMsg(
+                self.tr('Log in to keep syncing'),
+                self.tr('Your Blackboard session expired. Click the tray '
+                        'icon to log in. Tip: Settings > Automatic login '
+                        'reconnects on its own.'),
+                Severity.WARNING.value, Duration.LONG
             )
         }
 

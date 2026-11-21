@@ -12,6 +12,8 @@ def make_controller():
     controller._pending_setup_course_selection = False
     controller.open_login = mock.Mock()
     controller.check_for_updates = mock.Mock()
+    controller._auth_alert = mock.Mock()
+    controller._auth_required_since = None
     return controller
 
 
@@ -100,3 +102,37 @@ def test_log_in_failure_notifies_error():
 
     controller.ui.notify_login_error.assert_called_once()
     controller.model.start_sync.assert_not_called()
+
+
+def test_auth_required_reopens_login_without_saved_credentials():
+    from datetime import timedelta
+    controller = make_controller()
+    controller._mcp_open_login = mock.Mock()
+    controller._last_auto_login = None
+    controller._auth_alert.isActive.return_value = False
+
+    SyncController._handle_auth_required(controller)
+    controller._mcp_open_login.assert_called_once()
+    controller._auth_alert.start.assert_called_once()
+
+    # 401 again right after relogin: no reopen loop
+    SyncController._handle_auth_required(controller)
+    controller._mcp_open_login.assert_called_once()
+
+    controller._last_auto_login -= timedelta(minutes=11)
+    SyncController._handle_auth_required(controller)
+    assert controller._mcp_open_login.call_count == 2
+
+
+def test_auth_alert_notifies_then_repeats_slowly():
+    controller = make_controller()
+    controller._auth_required = True
+
+    SyncController._auth_alert_due(controller)
+
+    controller.ui.notify_auth_required.assert_called_once()
+    controller._auth_alert.setInterval.assert_called_once()
+
+    controller._auth_required = False
+    SyncController._auth_alert_due(controller)
+    controller._auth_alert.stop.assert_called_once()
