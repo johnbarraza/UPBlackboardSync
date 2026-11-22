@@ -78,7 +78,8 @@ class TrayMessages(QObject):
             ),
             Event.UPDATING: SyncTrayMsg(
                 self.tr('Updating BlackboardSync'),
-                self.tr('Downloading the update. The app restarts on its own.'),
+                self.tr('Downloading the update. '
+                        'The app restarts on its own.'),
                 Severity.INFORMATION.value, Duration.LONG
             )
         }
