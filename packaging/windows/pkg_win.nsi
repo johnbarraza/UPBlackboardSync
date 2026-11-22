@@ -41,6 +41,8 @@ RequestExecutionLevel user
 # Uninstaller Pages
 !insertmacro MUI_UNPAGE_WELCOME
 !insertmacro MUI_UNPAGE_CONFIRM
+!define MUI_COMPONENTSPAGE_TEXT_TOP "Choose what to remove. Downloaded course files are never deleted."
+!insertmacro MUI_UNPAGE_COMPONENTS
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_UNPAGE_FINISH
 
@@ -92,26 +94,13 @@ Section "Installation" SecInstall
 SectionEnd
 
 
-Section "Uninstall"
+Section "un.Blackboard Sync (app)" SecUnApp
+  SectionIn RO
+
   ; A running copy would keep its files locked.
   nsExec::Exec 'taskkill /F /IM BlackboardSync.exe'
   Pop $0
   Sleep 1500
-
-  ; Remove app-owned config, Drive token, and diagnostic logs.
-  RMDir /r "${APP_DATA_DIR}"
-
-  ; Login browser profile (session cookies) and its cache live under the
-  ; Qt app name, outside APP_DATA_DIR.
-  RMDir /r "$APPDATA\{{ title }}"
-  RMDir /r "$LOCALAPPDATA\{{ title }}"
-
-  ; Saved login in Windows Credential Manager (keyring service name;
-  ; keyring may store it as "<user>@<service>").
-  nsExec::Exec 'cmdkey /delete:BlackboardSync'
-  Pop $0
-  nsExec::Exec 'cmdkey /delete:login@BlackboardSync'
-  Pop $0
 
   ; Remove Application
   RMDir /r $INSTDIR
@@ -128,4 +117,25 @@ Section "Uninstall"
   ; Delete Shortcuts
   Delete "${SYNC_LNK}"
   Delete "${UNINSTALL_LNK}"
+SectionEnd
+
+
+; Checked by default (also what /S does). Unchecked = keep settings and
+; login for a later reinstall. Downloads are never touched: the folder may
+; be synced elsewhere (Syncthing, Drive) and a delete would propagate.
+Section "un.Settings, saved login and app data" SecUnData
+  ; Config, Drive token and diagnostic logs.
+  RMDir /r "${APP_DATA_DIR}"
+
+  ; Login browser profile (session cookies) and its cache live under the
+  ; Qt app name, outside APP_DATA_DIR.
+  RMDir /r "$APPDATA\{{ title }}"
+  RMDir /r "$LOCALAPPDATA\{{ title }}"
+
+  ; Saved login in Windows Credential Manager (keyring service name;
+  ; keyring may store it as "<user>@<service>").
+  nsExec::Exec 'cmdkey /delete:BlackboardSync'
+  Pop $0
+  nsExec::Exec 'cmdkey /delete:login@BlackboardSync'
+  Pop $0
 SectionEnd

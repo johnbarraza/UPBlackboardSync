@@ -11,9 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - In-app update (installed Windows app): clicking "An update is available" downloads the latest installer, verifies its SHA-256 against the digest GitHub publishes, waits for the current file download to finish, installs silently and relaunches. Settings, downloads and login are kept. Portable exe, Linux and macOS open the release page instead.
 - "Uninstall Blackboard Sync" shortcut in the Start menu.
+- Uninstaller page with a checkbox "Settings, saved login and app data" (checked by default) to also delete preferences, logs, login cookies/cache and the saved login. Downloaded course files are never deleted (the folder may be synced elsewhere).
 
 ### Fixed
-- Uninstaller now closes a running copy and also removes the login browser profile (session cookies, cache) and the saved login in Windows Credential Manager, which were left behind before.
+- Uninstaller now closes a running copy; with the data checkbox it also removes the login browser profile (session cookies, cache) and the saved login in Windows Credential Manager, which were left behind before.
 
 ## [1.3.11] - 2026-11-21
 
