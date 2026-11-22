@@ -324,14 +324,13 @@ class TestSyncTrayIcon:
         assert 'years' in tray_icon._menu._status.text()
 
 
-def test_update_toast_click_opens_download(tray_icon, monkeypatch):
-    import webbrowser
+def test_update_toast_click_requests_update(tray_icon):
     from blackboard_sync.qt.notification import Event
-    opened = []
-    monkeypatch.setattr(webbrowser, "open", opened.append)
+    fired = []
+    tray_icon.signals.update.connect(lambda: fired.append(1))
     tray_icon.notify(Event.DOWNLOAD_ERROR)
     tray_icon.messageClicked.emit()
-    assert opened == []
+    assert fired == []
     tray_icon.notify(Event.UPDATE_AVAILABLE)
     tray_icon.messageClicked.emit()
-    assert len(opened) == 1 and "/releases/latest" in opened[0]
+    assert fired == [1]

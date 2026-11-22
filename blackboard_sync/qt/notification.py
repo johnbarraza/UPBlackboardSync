@@ -27,6 +27,7 @@ class Event(Enum):
     DOWNLOAD_ERROR = auto()
     APP_RUNNING = auto()
     AUTH_REQUIRED = auto()
+    UPDATING = auto()
 
 
 class Severity(Enum):
@@ -55,7 +56,7 @@ class TrayMessages(QObject):
         self.messages = {
             Event.UPDATE_AVAILABLE: SyncTrayMsg(
                 self.tr('An update is available'),
-                self.tr('Download the latest version from GitHub Releases'),
+                self.tr('Click here to update'),
                 Severity.INFORMATION.value, Duration.SHORT
             ),
             Event.DOWNLOAD_ERROR: SyncTrayMsg(
@@ -74,6 +75,11 @@ class TrayMessages(QObject):
                         'log in. Tip: Settings > Automatic login '
                         'reconnects on its own.'),
                 Severity.WARNING.value, Duration.LONG
+            ),
+            Event.UPDATING: SyncTrayMsg(
+                self.tr('Updating BlackboardSync'),
+                self.tr('Downloading the update. The app restarts on its own.'),
+                Severity.INFORMATION.value, Duration.LONG
             )
         }
 

@@ -15,7 +15,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301, USA.
 
-import sys
 from datetime import datetime
 import webbrowser
 
@@ -132,6 +131,7 @@ class SyncTrayIcon(QSystemTrayIcon):
         open_dashboard = pyqtSignal()
         show_menu = pyqtSignal()
         log_in = pyqtSignal()
+        update = pyqtSignal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -142,13 +142,8 @@ class SyncTrayIcon(QSystemTrayIcon):
         self._init_ui()
 
     def _on_message_clicked(self) -> None:
-        # "Update available" toast → download the installer (Windows) or
-        # open the release page; installing over the old one keeps settings.
         if self._last_event is Event.UPDATE_AVAILABLE:
-            latest = f"{__uri__}/releases/latest"
-            if sys.platform == "win32":
-                latest += "/download/BlackboardSync-Setup.exe"
-            webbrowser.open(latest)
+            self.signals.update.emit()
         elif self._last_event is Event.AUTH_REQUIRED:
             self.signals.log_in.emit()
 

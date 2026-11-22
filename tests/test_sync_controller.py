@@ -146,3 +146,46 @@ def test_auth_alert_notifies_then_repeats_slowly():
     controller.model.is_logged_in = True
     SyncController._auth_alert_due(controller)
     controller._auth_alert.stop.assert_called_once()
+
+
+def test_update_click_on_portable_opens_release_page(monkeypatch):
+    controller = make_controller()
+    monkeypatch.setattr("blackboard_sync.sync_controller.is_installed", lambda: False)
+    opened = mock.Mock()
+    monkeypatch.setattr("blackboard_sync.sync_controller.webbrowser.open", opened)
+
+    SyncController.update_now(controller)
+
+    opened.assert_called_once()
+    controller.ui.notify_updating.assert_not_called()
+
+
+def test_install_update_stops_sync_then_runs_silent_installer(monkeypatch):
+    controller = make_controller()
+    controller._updating = True
+    controller.quit = mock.Mock()
+    controller.model.is_active = True
+    controller.model.sync_thread.is_alive.return_value = True
+    popen = mock.Mock()
+    monkeypatch.setattr("blackboard_sync.sync_controller.subprocess.Popen", popen)
+
+    SyncController._install_update(controller, "C:/tmp/BlackboardSync-Setup.exe")
+
+    controller.model.stop_sync.assert_called_once()
+    controller.model.sync_thread.join.assert_called_once()
+    assert popen.call_args.args[0] == ["C:/tmp/BlackboardSync-Setup.exe", "/S"]
+    controller.quit.assert_called_once()
+    controller.ui.slot_quit.assert_called_once()
+
+
+def test_install_update_failed_download_opens_release_page(monkeypatch):
+    controller = make_controller()
+    controller._updating = True
+    opened = mock.Mock()
+    monkeypatch.setattr("blackboard_sync.sync_controller.webbrowser.open", opened)
+
+    SyncController._install_update(controller, "")
+
+    opened.assert_called_once()
+    controller.model.stop_sync.assert_not_called()
+    assert controller._updating is False

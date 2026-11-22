@@ -362,8 +362,8 @@
     </message>
     <message>
         <location filename="../notification.py" line="57"/>
-        <source>You can update the app from your digital store</source>
-        <translation>Puedes actualizar la app desde tu tienda digital</translation>
+        <source>Click here to update</source>
+        <translation>Haz clic aquí para actualizar</translation>
     </message>
     <message>
         <location filename="../notification.py" line="61"/>
@@ -394,6 +394,16 @@
         <location filename="../notification.py" line="72"/>
         <source>Your Blackboard session expired. Click here to log in. Tip: Settings &gt; Automatic login reconnects on its own.</source>
         <translation>Tu sesión de Blackboard venció. Haz clic aquí para iniciar sesión. Consejo: Configuración &gt; Inicio de sesión automático reconecta solo.</translation>
+    </message>
+    <message>
+        <location filename="../notification.py" line="80"/>
+        <source>Updating BlackboardSync</source>
+        <translation>Actualizando BlackboardSync</translation>
+    </message>
+    <message>
+        <location filename="../notification.py" line="81"/>
+        <source>Downloading the update. The app restarts on its own.</source>
+        <translation>Descargando la actualización. La app se reinicia sola.</translation>
     </message>
 </context>
 <context>

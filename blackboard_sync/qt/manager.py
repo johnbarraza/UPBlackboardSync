@@ -49,6 +49,7 @@ class UIManager(QObject):
         redownload = pyqtSignal()
         quit = pyqtSignal()
         reconnect = pyqtSignal()
+        update = pyqtSignal()
 
     def __init__(self, id: str, title: str, uri: str,
                  universities: list[str], autodetected: int | None) -> None:
@@ -107,6 +108,7 @@ class UIManager(QObject):
         self.tray.signals.open_dashboard.connect(self.signals.open_dashboard)
         self.tray.signals.quit.connect(self.signals.quit)
         self.tray.signals.log_in.connect(self.signals.reconnect)
+        self.tray.signals.update.connect(self.signals.update)
         self.tray.signals.reset_setup.connect(self.slot_open_setup)
         self.tray.activated.connect(self.slot_open_tray)
         self.tray.signals.quit.connect(self.slot_quit)
@@ -312,3 +314,6 @@ class UIManager(QObject):
 
     def notify_update(self) -> None:
         self.tray.notify(Event.UPDATE_AVAILABLE)
+
+    def notify_updating(self) -> None:
+        self.tray.notify(Event.UPDATING)

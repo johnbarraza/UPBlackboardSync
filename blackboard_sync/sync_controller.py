@@ -3,6 +3,9 @@
 """BlackboardSync Controller."""
 
 import logging
+import subprocess
+import threading
+import webbrowser
 from datetime import datetime, timedelta, timezone
 
 from PyQt6.QtCore import QTimer
@@ -30,7 +33,8 @@ from .sync import BlackboardSync
 from .__about__ import __id__, __title__, __uri__, __version__ as _HARDCODED_VERSION
 from .institutions import get_names, autodetect
 
-from .updates import check_for_updates
+from .updates import (RELEASES_PAGE, check_for_updates, download_installer,
+                      is_installed)
 from .qt.manager import UIManager
 from .qt.dialogs import DiagnosticsDialog
 from .mcp_server import MCPBridge, MCPServer
@@ -71,6 +75,8 @@ class SyncController:
         self._mcp_bridge.open_login_requested.connect(self._mcp_open_login)
         self._mcp_bridge.restart_sync_requested.connect(self._restart_sync)
         self._mcp_bridge.auth_required.connect(self._handle_auth_required)
+        self._mcp_bridge.update_ready.connect(self._install_update)
+        self._updating = False
 
         self._mcp_server = MCPServer(
             get_status=self._mcp_get_status,
@@ -472,6 +478,7 @@ class SyncController:
         self.ui.signals.quit.connect(self.quit)
         self.ui.signals.auth_drive.connect(self.auth_drive)
         self.ui.signals.reconnect.connect(self.open_login)
+        self.ui.signals.update.connect(self.update_now)
 
     def open_login(self) -> None:
         start_url = str(self.model.university.login.start_url)
@@ -608,6 +615,56 @@ class SyncController:
     def check_for_updates(self) -> None:
         if check_for_updates():
             self.ui.notify_update()
+
+    def update_now(self) -> None:
+        """Update toast clicked: installed app updates itself in place.
+
+        Portable exe / Linux / macOS: open the release page instead.
+        """
+        if not is_installed():
+            webbrowser.open(RELEASES_PAGE)
+            return
+        if self._updating:
+            return
+        self._updating = True
+        self.ui.notify_updating()
+        threading.Thread(target=self._download_update, daemon=True).start()
+
+    def _download_update(self) -> None:
+        """Worker thread: download + verify, then hand back to Qt."""
+        path = download_installer()
+        self._mcp_bridge.update_ready.emit(str(path) if path else "")
+
+    def _install_update(self, path: str) -> None:
+        """Qt thread: stop syncing cleanly, run the installer, exit."""
+        self._updating = False
+        if not path:
+            webbrowser.open(RELEASES_PAGE)
+            return
+
+        was_active = self.model.is_active
+        if was_active:
+            self.model.stop_sync()
+        # let a file being written finish instead of being killed mid-write
+        sync_thread = getattr(self.model, "sync_thread", None)
+        if sync_thread is not None and sync_thread.is_alive():
+            sync_thread.join(timeout=60)
+
+        try:
+            # /S: silent; the installer closes us, replaces the exe and
+            # relaunches the app (settings, downloads and login are kept)
+            subprocess.Popen([path, "/S"], close_fds=True,
+                             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+        except OSError:
+            logger.exception("Could not start the installer")
+            if was_active:
+                self.model.start_sync()
+            webbrowser.open(RELEASES_PAGE)
+            return
+
+        logger.info("Installer started, quitting for update")
+        self.quit()
+        self.ui.slot_quit()
 
     def auth_drive(self, credentials_path: str | None) -> None:
         if credentials_path:

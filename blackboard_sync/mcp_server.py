@@ -199,6 +199,8 @@ class MCPBridge(QObject):
     restart_sync_requested = pyqtSignal()
     # not MCP: sync thread -> Qt thread when the session expires
     auth_required = pyqtSignal()
+    # not MCP: update worker thread -> Qt thread with the installer path
+    update_ready = pyqtSignal(str)
 
 
 # ---------------------------------------------------------------------------

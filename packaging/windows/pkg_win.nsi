@@ -22,6 +22,7 @@ RequestExecutionLevel user
 !define APP_DATA_DIR "$APPDATA\BlackboardSync"
 
 !define SYNC_LNK "$SMPROGRAMS\{{ title }}.lnk"
+!define UNINSTALL_LNK "$SMPROGRAMS\Uninstall {{ title }}.lnk"
 
 # MUI Settings
 !define MUI_LICENSEPAGE_TEXT_BOTTOM "You are now aware of your rights. Click next to continue."
@@ -72,6 +73,7 @@ Section "Installation" SecInstall
 
     ; Shortcut
     CreateShortCut "${SYNC_LNK}" "${SYNC_EXE}"
+    CreateShortCut "${UNINSTALL_LNK}" "$INSTDIR\Uninstall.exe"
 
     ; Uninstall Menu
     WriteRegStr HKCU ${UNINSTALL_REGKEY} "DisplayName" "{{ title }}"
@@ -83,12 +85,33 @@ Section "Installation" SecInstall
     WriteRegStr HKCU ${UNINSTALL_REGKEY} "DisplayVersion" "${VERSION}"
 
     WriteUninstaller "$INSTDIR\Uninstall.exe"
+
+    ; In-app update runs us with /S (no finish page): relaunch the app.
+    IfSilent 0 +2
+        Exec '"${SYNC_EXE}"'
 SectionEnd
 
 
 Section "Uninstall"
+  ; A running copy would keep its files locked.
+  nsExec::Exec 'taskkill /F /IM BlackboardSync.exe'
+  Pop $0
+  Sleep 1500
+
   ; Remove app-owned config, Drive token, and diagnostic logs.
   RMDir /r "${APP_DATA_DIR}"
+
+  ; Login browser profile (session cookies) and its cache live under the
+  ; Qt app name, outside APP_DATA_DIR.
+  RMDir /r "$APPDATA\{{ title }}"
+  RMDir /r "$LOCALAPPDATA\{{ title }}"
+
+  ; Saved login in Windows Credential Manager (keyring service name;
+  ; keyring may store it as "<user>@<service>").
+  nsExec::Exec 'cmdkey /delete:BlackboardSync'
+  Pop $0
+  nsExec::Exec 'cmdkey /delete:login@BlackboardSync'
+  Pop $0
 
   ; Remove Application
   RMDir /r $INSTDIR
@@ -102,6 +125,7 @@ Section "Uninstall"
   ; Uninstall Menu Entry
   DeleteRegKey HKCU ${UNINSTALL_REGKEY}
 
-  ; Delete Shortcut
+  ; Delete Shortcuts
   Delete "${SYNC_LNK}"
+  Delete "${UNINSTALL_LNK}"
 SectionEnd
