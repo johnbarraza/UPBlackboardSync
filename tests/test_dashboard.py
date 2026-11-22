@@ -27,3 +27,18 @@ def test_dashboard_indexes_courses_files_and_announcements(tmp_path):
     assert (tmp_path / DASHBOARD_NAME).exists()
     blob = html.split('type="application/json">', 1)[1].split("</script>", 1)[0]
     assert json.loads(blob)["announcements"][0]["body"] == "El lunes </script>."
+
+
+def test_dashboard_embeds_connection_status(tmp_path):
+    from datetime import datetime, timezone
+    since = datetime(2026, 11, 21, 7, 24, tzinfo=timezone.utc)
+
+    def status(html):
+        blob = html.split('type="application/json">', 1)[1].split("</script>", 1)[0]
+        return json.loads(blob)["status"]
+
+    ok = write_dashboard(tmp_path).read_text(encoding="utf-8")
+    assert status(ok) == {"state": "ok", "since": None}
+    auth = write_dashboard(tmp_path, "auth", since).read_text(encoding="utf-8")
+    assert status(auth) == {"state": "auth", "since": since.isoformat()}
+    assert 'id="conn"' in auth

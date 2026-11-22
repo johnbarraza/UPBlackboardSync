@@ -109,10 +109,19 @@ def build_index(root: Path) -> dict:
     }
 
 
-def write_dashboard(root: Path) -> Path | None:
-    """(Re)generate the dashboard HTML. Never raises."""
+def write_dashboard(root: Path, state: str = "ok",
+                    since: datetime | None = None) -> Path | None:
+    """(Re)generate the dashboard HTML. Never raises.
+
+    state: "ok" (sync finished), "auth" (session expired) or "offline"
+    (network errors since ``since``). The page also flags itself stale
+    when ``generated`` gets old, i.e. the app stopped writing it.
+    """
     try:
-        data = json.dumps(build_index(root), ensure_ascii=False)
+        index = build_index(root)
+        index["status"] = {"state": state,
+                           "since": since.isoformat() if since else None}
+        data = json.dumps(index, ensure_ascii=False)
         data = data.replace("</", "<\\/")  # keep </script> out of the JSON blob
         out = root / DASHBOARD_NAME
         out.write_text(_TEMPLATE.replace("__DATA__", data), encoding="utf-8")
@@ -198,6 +207,17 @@ a.row:hover{background:var(--bg)}
 .tree .row{border:0;padding:6px 8px 6px 22px;border-radius:6px}
 .tree .ico{width:26px;height:26px;font-size:9px}
 .empty{padding:18px;color:var(--muted)}
+.conn{display:flex;align-items:flex-start;gap:8px;margin:0 8px 14px;padding:8px 10px;
+  border-radius:10px;font-size:12px;line-height:1.4;background:var(--bg)}
+.conn .dot{width:8px;height:8px;border-radius:50%;flex:none;margin-top:4px;
+  background:var(--muted)}
+.conn.ok .dot{background:#16a34a}
+.conn.warn{background:#fef3c7;color:#92400e}.conn.warn .dot{background:#d97706}
+.conn.bad{background:#fee2e2;color:#991b1b}.conn.bad .dot{background:#dc2626}
+@media (prefers-color-scheme:dark){
+  .conn.warn{background:#3a2a0d;color:#fcd34d}
+  .conn.bad{background:#3b1414;color:#fca5a5}
+}
 .group{margin-bottom:14px}
 .ghead{display:flex;justify-content:space-between;align-items:baseline;width:100%;
   border:0;background:none;color:var(--accent);font:inherit;font-weight:600;
@@ -215,6 +235,7 @@ a.row:hover{background:var(--bg)}
   <aside>
     <div class="brand">BlackboardSync</div>
     <div class="sub" id="gen"></div>
+    <div class="conn" id="conn" role="status"></div>
     <input type="search" id="q" placeholder="Buscar archivo o anuncio…">
     <button class="nav on" data-view="home">Novedades <span class="n" id="newcount"></span></button>
     <div id="courses"></div>
@@ -340,6 +361,35 @@ document.addEventListener('click', e => {
 });
 $('#q').addEventListener('input', render);
 $('#gen').textContent = 'Actualizado ' + fmtDate(D.generated);
+
+// Connection pill. The file is static (and may arrive via Syncthing), so
+// "stale" = the app stopped rewriting it: PC off, app closed or no sync.
+const STALE = 3 * 36e5;
+const ago = iso => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso)) / 6e4));
+  return m < 60 ? `hace ${m} min` : m < 2880 ? `hace ${Math.round(m / 60)} h`
+    : `hace ${Math.round(m / 1440)} días`;
+};
+function renderConn() {
+  const s = D.status || {state: 'ok'};
+  const stale = Date.now() - new Date(D.generated) > STALE;
+  const [cls, text] =
+    s.state === 'auth' ? ['bad', 'Sesión vencida: abre BlackboardSync e inicia sesión'
+      + (s.since ? ' (desde ' + fmtDate(s.since) + ')' : '')] :
+    s.state === 'offline' ? ['warn', 'Sin conexión a Blackboard'
+      + (s.since ? ' desde ' + fmtDate(s.since) : '')] :
+    stale ? ['stale', 'Sin noticias de la app ' + ago(D.generated)
+      + ': ¿PC apagada o app cerrada?'] :
+    ['ok', 'Conectado · último sync ' + ago(D.generated)];
+  $('#conn').className = 'conn ' + cls;
+  $('#conn').innerHTML = `<span class="dot"></span><span>${esc(text)}</span>`;
+}
+renderConn();
+setInterval(renderConn, 6e4);
+// pick up a newer file when coming back to an old tab
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - now > 5 * 6e4) location.reload();
+});
 $('#newcount').textContent = D.recent.filter(f => isNew(f.mtime)).length || '';
 render();
 </script>

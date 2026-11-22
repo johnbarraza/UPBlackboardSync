@@ -38,6 +38,7 @@ from blackboard.filters import BBMembershipFilter, BWFilter
 from blackboard.blackboard import BBCourse
 
 from .config import SyncConfig
+from .dashboard import write_dashboard
 from .download import BlackboardDownload
 from .institutions import Institution, get_by_index
 from .drive_service import DriveService
@@ -210,6 +211,7 @@ class BlackboardSync:
                 logger.warning("Session expired - please log in again from the application")
                 logger.info("Your session may have expired because you logged in from another location (browser, mobile app, etc.)")
             self._offline_since = None
+            write_dashboard(self.download_location, "auth", datetime.now(timezone.utc))
             self.log_out()
             if self._auth_required_callback is not None:
                 self._auth_required_callback()
@@ -217,6 +219,7 @@ class BlackboardSync:
             self.last_error = "network"
             if self._offline_since is None:
                 self._offline_since = datetime.now(timezone.utc)
+            write_dashboard(self.download_location, "offline", self._offline_since)
             logger.warning(f"Network error during sync: {type(e).__name__}")
             logger.info("The sync will be retried automatically on the next scheduled sync")
             # Don't mark as permanent error, just postpone

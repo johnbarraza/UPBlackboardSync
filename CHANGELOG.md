@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Dashboard (`BlackboardSync.html`) shows connection status: connected / no network since / session expired, and "no news from the app for X h" when the file stopped being rewritten (PC off, app closed). Works on a copy synced to another PC (Syncthing). An old tab reloads itself when shown again.
+
 ## [1.3.12] - 2026-11-21
 
 ### Added
